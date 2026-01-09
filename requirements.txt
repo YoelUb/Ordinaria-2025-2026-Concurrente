@@ -1,0 +1,31 @@
+# --- Framework ---
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# --- Base de Datos ---
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+# Sistema de migraciones
+alembic==1.13.1
+
+# --- Configuración y variables de entorno ---
+pydantic-settings==2.1.0
+python-dotenv==1.0.1
+
+# --- Validación de datos ---
+pydantic[email]==2.5.3
+
+# --- Seguridad ---
+# Para hashear contraseñas
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+# Para generar tokens JWT
+python-jose[cryptography]==3.3.0
+
+# --- Servicios externos ---
+# SDK Admin de Firebase
+firebase-admin==6.4.0
+
+# --- Testing ---
+pytest==8.0.0
+httpx==0.26.0
