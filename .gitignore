@@ -1,0 +1,61 @@
+# Archivos de variables de entorno
+.env
+.env.prod
+.env.dev
+.env.test
+
+# Credenciales de Google/Firebase
+firebase_credentials.json
+service-account-file.json
+*.pem
+*.key
+
+# Excepción: Para otros desarrolladores sepan qué configurar
+!.env.example
+
+
+# Bytecode compilado
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+.env_dir/
+
+# Distribución y empaquetado
+dist/
+build/
+*.egg-info/
+
+# DOCKER
+# Logs de contenedores
+*.log
+# Datos persistentes
+postgres_data/
+# Archivos override
+docker-compose.override.yml
+
+# Base de datos
+# Archivos SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+
+# VS Code
+.vscode/
+# PyCharm / IntelliJ
+.idea/
+# Mac
+.DS_Store
+# Windows
+Thumbs.db

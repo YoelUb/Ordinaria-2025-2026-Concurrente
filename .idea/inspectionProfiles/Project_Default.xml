@@ -1,0 +1,50 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyInterpreterInspection" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="pytest-asyncio" />
+          <option value="annotated-doc" />
+          <option value="annotated-types" />
+          <option value="anyio" />
+          <option value="bcrypt" />
+          <option value="cffi" />
+          <option value="click" />
+          <option value="cryptography" />
+          <option value="fastapi" />
+          <option value="h11" />
+          <option value="httptools" />
+          <option value="idna" />
+          <option value="jinja2" />
+          <option value="markupsafe" />
+          <option value="passlib" />
+          <option value="prometheus-client" />
+          <option value="prometheus-fastapi-instrumentator" />
+          <option value="psycopg2-binary" />
+          <option value="pycparser" />
+          <option value="pydantic" />
+          <option value="pydantic-core" />
+          <option value="pyjwt" />
+          <option value="python-dotenv" />
+          <option value="python-http-client" />
+          <option value="pyyaml" />
+          <option value="sendgrid" />
+          <option value="six" />
+          <option value="sqlalchemy" />
+          <option value="sqlmodel" />
+          <option value="starlette" />
+          <option value="typing-extensions" />
+          <option value="typing-inspection" />
+          <option value="uvicorn" />
+          <option value="uvloop" />
+          <option value="watchfiles" />
+          <option value="websockets" />
+          <option value="werkzeug" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="SqlNoDataSourceInspection" enabled="false" level="WARNING" enabled_by_default="false" />
+  </profile>
+</component>
