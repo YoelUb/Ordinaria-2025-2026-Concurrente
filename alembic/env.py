@@ -7,6 +7,7 @@ from os.path import abspath, dirname
 from src.db.base import Base
 from src.core.config import settings
 from src.models import user_model
+from src.models import reservation_model
 
 
 sys.path.insert(0, dirname(dirname(abspath(__file__))))

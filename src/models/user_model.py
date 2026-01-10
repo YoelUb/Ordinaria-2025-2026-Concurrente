@@ -1,26 +1,24 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from src.db.base import Base
 
 
-# Base común usuarios
-class UserBase(BaseModel):
-    email: EmailStr
-    full_name: Optional[str] = None
-    apartment: Optional[str] = None
-    phone: Optional[str] = None
-    is_active: bool = True
+class User(Base):
+    __tablename__ = "users"
 
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
 
-# Crear usuario
-class UserCreate(UserBase):
-    password: str
+    apartment = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
 
+    is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False)
 
-# Respuesta de usuario sin contraseña
-class UserResponse(UserBase):
-    id: int
-    created_at: datetime
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    class Config:
-        from_attributes = True
+    reservations = relationship("Reservation", back_populates="user")
