@@ -7,15 +7,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        gta: ['Anton', 'sans-serif'],
+        'gta': ['Anton', 'sans-serif'], // Fuente de títulos
+        'sans': ['Inter', 'sans-serif'], // Fuente de lectura
       },
       colors: {
-        rockstar: {
-          yellow: '#FFAB00',
-          black: '#0a0a0a',
-          gray: '#1c1c1c'
-        }
+        'r-yellow': '#FFAB00', // Amarillo Rockstar
+        'r-black': '#050505',
+      },
+      backgroundImage: {
+        'noise': "url('https://grainy-gradients.vercel.app/noise.svg')", // Textura de grano
       }
     },
   },
