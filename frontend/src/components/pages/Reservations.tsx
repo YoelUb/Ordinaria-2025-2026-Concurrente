@@ -5,7 +5,7 @@ import { Header } from '../layout/Header';
 import { ServiceCard } from '../services/ServiceCard';
 import { Calendar } from '../reservations/Calendar';
 import { TimeSlots } from '../reservations/TimeSlots';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 const SERVICES = [
   { id: 'Padel 1', name: 'PISTA PÁDEL 1', desc: 'Máximo 4 jugadores. 90 mins.' },
@@ -25,8 +25,9 @@ export function Reservations() {
   const handleConfirm = async () => {
     if (!service || !date || !time) return;
     setLoading(true);
-    const startTime = `${format(date, 'yyyy-MM-dd')}T${time}:00`;
 
+    // Formateo de fechas para el backend
+    const startTime = `${format(date, 'yyyy-MM-dd')}T${time}:00`;
     const endHour = parseInt(time.split(':')[0]) + 1;
     const endTime = `${format(date, 'yyyy-MM-dd')}T${endHour.toString().padStart(2, '0')}:${time.split(':')[1]}:00`;
 
@@ -39,6 +40,7 @@ export function Reservations() {
       alert('Reserva confirmada correctamente');
       window.location.href = '/dashboard';
     } catch (error) {
+      console.error(error);
       alert('Error: La pista ya está reservada o hubo un conflicto.');
     } finally {
       setLoading(false);

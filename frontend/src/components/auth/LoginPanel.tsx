@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../services/api.ts';
-import { useAuth } from '../../hooks/useAuth.ts';
+import { api } from '../../services/api.tsx';
+import { useAuth } from '../../hooks/useAuth.tsx';
 
 export function LoginPanel() {
   const [email, setEmail] = useState('');

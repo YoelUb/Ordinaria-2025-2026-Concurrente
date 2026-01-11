@@ -7,15 +7,18 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'gta': ['Anton', 'sans-serif'], // Fuente de títulos
-        'sans': ['Inter', 'sans-serif'], // Fuente de lectura
+        // Usamos 'luxury' para Playfair
+        'luxury': ['"Playfair Display"', 'serif'],
+
+        'sans-clean': ['"Inter"', 'sans-serif'],
       },
       colors: {
-        'r-yellow': '#FFAB00', // Amarillo Rockstar
-        'r-black': '#050505',
+        'luxury-gold': '#D4AF37',
+        'luxury-black': '#0a0a0a',
+        'luxury-gray': '#F5F5F7',
       },
       backgroundImage: {
-        'noise': "url('https://grainy-gradients.vercel.app/noise.svg')", // Textura de grano
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       }
     },
   },
