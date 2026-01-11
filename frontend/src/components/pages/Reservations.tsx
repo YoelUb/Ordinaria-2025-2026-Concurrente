@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Background } from '../components/layout/Background';
-import { Header } from '../components/layout/Header';
-import { ServiceCard } from '../components/services/ServiceCard';
-import { Calendar } from '../components/reservations/Calendar';
-import { TimeSlots } from '../components/reservations/TimeSlots';
+import { Background } from '../layout/Background';
+import { Header } from '../layout/Header';
+import { ServiceCard } from '../services/ServiceCard';
+import { Calendar } from '../reservations/Calendar';
+import { TimeSlots } from '../reservations/TimeSlots';
 import { api } from '../services/api';
 
 const SERVICES = [

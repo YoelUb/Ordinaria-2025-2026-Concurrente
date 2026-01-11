@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { Background } from '../components/layout/Background';
-import { Header } from '../components/layout/Header';
+import { Background } from '../layout/Background';
+import { Header } from '../layout/Header';
 
 export function Home() {
   const navigate = useNavigate();

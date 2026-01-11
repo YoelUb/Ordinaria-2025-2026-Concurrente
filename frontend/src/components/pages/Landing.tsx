@@ -2,52 +2,106 @@ import { useLayoutEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Lock, MapPin } from 'lucide-react';
+import { ArrowRight, Lock, MapPin, Star } from 'lucide-react';
 
 gsap.registerPlugin(ScrollTrigger);
 
+const FACILITIES = [
+  {
+    id: 'padel',
+    title: "ZONA PÁDEL",
+    subtitle: "Competición Nocturna",
+    desc: "Pistas reglamentarias con iluminación LED y césped de competición WPT.",
+    stats: ["4 Jugadores", "90 Minutos", "Iluminación Pro"],
+    images: [
+      "https://images.unsplash.com/photo-1626224583764-847649623dbb?auto=format&fit=crop&q=80", // Placeholder
+      "https://images.unsplash.com/photo-1599586120429-48281b6f0ece?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1625842268584-8f3296236761?auto=format&fit=crop&q=80"
+    ]
+  },
+  {
+    id: 'pool',
+    title: "INFINITY POOL",
+    subtitle: "Oasis Urbano",
+    desc: "Control de aforo digital. Agua salina climatizada y zona de solárium exclusiva.",
+    stats: ["Aforo Limitado", "Agua Salina", "Chill Out"],
+    images: [
+      "https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1532517891316-72a08e5c03a7?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&q=80"
+    ]
+  },
+  {
+    id: 'gym',
+    title: "IRON GYM",
+    subtitle: "Alto Rendimiento",
+    desc: "Equipamiento de última generación Technogym. Zona de peso libre y cardio con vistas.",
+    stats: ["24 Horas", "Climatizado", "Technogym"],
+    images: [
+      "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?auto=format&fit=crop&q=80"
+    ]
+  }
+];
+
 export function Landing() {
   const comp = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
 
-      // 1. Animación del Hero (El título hace zoom al bajar)
-      gsap.to(".hero-img", {
-        scale: 1.2,
-        scrollTrigger: {
-          trigger: ".hero-section",
-          start: "top top",
-          end: "bottom top",
-          scrub: true
-        }
-      });
+      const tl = gsap.timeline();
+      tl.from(".hero-title-char", {
+        y: 100,
+        opacity: 0,
+        duration: 1,
+        stagger: 0.05,
+        ease: "power4.out"
+      })
+      .from(".hero-subtitle", {
+        opacity: 0,
+        y: 20,
+        duration: 0.8
+      }, "-=0.5");
 
-      // 2. Animación de las Cards (Aparecen al hacer scroll)
-      const sections = gsap.utils.toArray('.info-section');
+      const sections = gsap.utils.toArray(".facility-section");
+
       sections.forEach((section: any) => {
-        gsap.from(section.querySelectorAll('.anim-text'), {
-          y: 50,
-          opacity: 0,
-          duration: 1,
-          stagger: 0.2,
+        const carousel = section.querySelector(".carousel-track");
+        const cards = section.querySelectorAll(".carousel-card");
+
+        const scrollWidth = carousel.scrollWidth - window.innerWidth + 100; // +100 padding
+
+        gsap.to(carousel, {
+          x: -scrollWidth,
+          ease: "none",
           scrollTrigger: {
             trigger: section,
-            start: "top 75%", // Empieza cuando la sección está al 75% de la vista
-            toggleActions: "play none none reverse"
+            start: "top top",
+            end: () => `+=${scrollWidth}`,
+            pin: true,
+            scrub: 1, 
+            invalidateOnRefresh: true,
           }
         });
 
-        gsap.from(section.querySelectorAll('.anim-img'), {
-          x: 100, // Vienen desde la derecha
-          opacity: 0,
-          duration: 1.2,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: section,
-            start: "top 70%",
-          }
+        // Animación parallax interna de las imágenes
+        cards.forEach((card: any) => {
+           gsap.fromTo(card.querySelector("img"),
+             { scale: 1.2 },
+             {
+               scale: 1,
+               scrollTrigger: {
+                 trigger: section,
+                 start: "top top",
+                 end: `+=${scrollWidth}`,
+                 scrub: true
+               }
+             }
+           );
         });
       });
 
@@ -57,112 +111,76 @@ export function Landing() {
   }, []);
 
   return (
-    <div ref={comp} className="relative w-full">
-      {/* --- NAVBAR FLOTANTE --- */}
-      <nav className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-8 py-6 mix-blend-difference text-white">
-        <div className="font-gta text-2xl tracking-widest">RESIDENCIAL <span className="text-r-yellow">V</span></div>
+    <div ref={comp} className="bg-[#050505] text-white min-h-screen selection:bg-[#FFAB00] selection:text-black overflow-x-hidden">
+
+      {/* NAVBAR FLOTANTE */}
+      <nav className="fixed top-0 w-full z-50 px-8 py-6 flex justify-between items-center mix-blend-difference">
+        <div className="font-gta text-2xl tracking-widest">RESIDENCIAL <span className="text-[#FFAB00]">V</span></div>
         <button
           onClick={() => navigate('/login')}
-          className="flex items-center gap-2 border border-white/30 px-6 py-2 rounded-full font-gta tracking-wider hover:bg-white hover:text-black transition-all"
+          className="flex items-center gap-2 border border-white/20 px-6 py-2 bg-black/50 backdrop-blur-md rounded-sm font-gta tracking-wider hover:bg-[#FFAB00] hover:text-black hover:border-[#FFAB00] transition-all duration-300"
         >
-          <Lock size={16} /> ÁREA SOCIOS
+          <Lock size={16} /> ACCESO SOCIOS
         </button>
       </nav>
 
-      {/* --- 1. HERO SECTION --- */}
-      <div className="hero-section relative h-screen w-full overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 z-0">
-            {/* Imagen de fondo de alta calidad */}
+
+      <section className="relative h-screen flex flex-col justify-center px-6 md:px-24 border-b border-white/10">
+        <div className="absolute inset-0 -z-10">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-black/40" />
             <img
-                src="https://images.unsplash.com/photo-1542259648-522c07c126d2?q=80&w=2069&auto=format&fit=crop"
-                alt="City"
-                className="hero-img w-full h-full object-cover brightness-50"
+                src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80"
+                className="w-full h-full object-cover opacity-30 grayscale"
+                alt="Background"
             />
         </div>
-        <div className="relative z-10 text-center px-4">
-          <h2 className="text-r-yellow font-gta tracking-[0.5em] text-xl mb-4 uppercase">Sistema de Gestión</h2>
-          <h1 className="font-gta text-7xl md:text-9xl text-white leading-none mb-6">
-            ORDEN Y <br /> PROGRESO
-          </h1>
-          <p className="max-w-xl mx-auto text-white/70 text-lg">
-            La plataforma exclusiva para la gestión de instalaciones comunitarias.
-            Reserva pistas, piscinas y zonas comunes con prioridad absoluta.
-          </p>
+
+        <div className="max-w-5xl">
+            <p className="hero-subtitle text-[#FFAB00] font-mono tracking-[0.3em] mb-4 text-sm md:text-base">SISTEMA INTEGRAL DE GESTIÓN</p>
+            <h1 className="font-gta text-7xl md:text-[10rem] leading-[0.85] uppercase mix-blend-screen">
+                <div className="overflow-hidden"><span className="hero-title-char inline-block">Control</span></div>
+                <div className="overflow-hidden text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-500">
+                    <span className="hero-title-char inline-block">Total</span>
+                </div>
+            </h1>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-10 animate-bounce">
-            <span className="font-gta text-xs tracking-widest text-white/50">SCROLL DOWN</span>
+        <div className="absolute bottom-12 left-6 md:left-24 flex items-center gap-4 animate-pulse">
+            <div className="w-12 h-[1px] bg-white/50"></div>
+            <span className="font-mono text-xs text-white/50 tracking-widest">SCROLL TO EXPLORE</span>
         </div>
-      </div>
+      </section>
 
-      {/* --- 2. SECCIÓN PÁDEL (Imagen Derecha) --- */}
-      <section className="info-section min-h-screen flex flex-col md:flex-row items-center bg-r-black border-t border-white/10">
-        <div className="w-full md:w-1/2 p-12 md:p-24 flex flex-col justify-center">
-            <div className="anim-text">
-                <h3 className="text-r-yellow font-gta text-xl mb-2">01. DEPORTE</h3>
-                <h2 className="font-gta text-6xl mb-6">PISTAS DE <br/>PÁDEL PRO</h2>
-                <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                    Dos pistas reglamentarias con iluminación LED nocturna.
-                    Sistema de reserva en tiempo real para evitar conflictos entre vecinos.
-                    El que reserva primero, juega. Sin excepciones.
-                </p>
-                <div className="flex gap-4 items-center text-sm font-bold uppercase tracking-widest">
-                    <MapPin className="text-r-yellow" /> Zona Norte
+      {/* 2. INSTALACIONES (HORIZONTAL SCROLL) */}
+      <div ref={containerRef}>
+        {FACILITIES.map((facility, index) => (
+          <section key={facility.id} className="facility-section relative h-screen w-full overflow-hidden flex flex-col justify-center border-t border-white/10 bg-[#050505]">
+
+            {/* Título de la sección*/}
+            <div className="absolute top-24 left-6 md:left-24 z-20 max-w-sm pointer-events-none">
+                <div className="flex items-center gap-2 text-[#FFAB00] mb-2">
+                    <MapPin size={16} />
+                    <span className="font-mono text-xs tracking-widest">INSTALACIÓN 0{index + 1}</span>
+                </div>
+                <h2 className="font-gta text-6xl md:text-8xl leading-none mb-6">{facility.title}</h2>
+                <p className="text-white/60 text-lg leading-relaxed mb-6">{facility.desc}</p>
+
+                <div className="flex flex-wrap gap-3">
+                    {facility.stats.map(stat => (
+                        <span key={stat} className="px-3 py-1 border border-white/20 text-xs font-mono uppercase tracking-wider text-white/80">
+                            {stat}
+                        </span>
+                    ))}
                 </div>
             </div>
-        </div>
-        <div className="w-full md:w-1/2 h-[50vh] md:h-screen relative overflow-hidden">
-            <img
-                src="https://images.unsplash.com/photo-1626224583764-847649623dbb?q=80&w=2070&auto=format&fit=crop"
-                className="anim-img w-full h-full object-cover"
-            />
-        </div>
-      </section>
 
-      {/* --- 3. SECCIÓN PISCINA (Imagen Izquierda) --- */}
-      <section className="info-section min-h-screen flex flex-col-reverse md:flex-row items-center bg-neutral-900">
-        <div className="w-full md:w-1/2 h-[50vh] md:h-screen relative overflow-hidden">
-            <img
-                src="https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?q=80&w=2070&auto=format&fit=crop"
-                className="anim-img w-full h-full object-cover"
-            />
-        </div>
-        <div className="w-full md:w-1/2 p-12 md:p-24 flex flex-col justify-center text-right md:text-left">
-            <div className="anim-text">
-                <h3 className="text-blue-400 font-gta text-xl mb-2">02. RELAX</h3>
-                <h2 className="font-gta text-6xl mb-6">PISCINA <br/>INFINITY</h2>
-                <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                    Control de aforo digital automatizado. Disfruta del verano sin aglomeraciones.
-                    Consulta la ocupación en directo desde tu panel de control personal.
-                </p>
-                <button onClick={() => navigate('/login')} className="inline-flex items-center gap-2 text-white border-b border-r-yellow pb-1 hover:text-r-yellow transition-colors font-gta tracking-widest text-xl">
-                    RESERVAR AHORA <ArrowRight size={20} />
-                </button>
-            </div>
-        </div>
-      </section>
-
-      {/* --- 4. CTA FINAL (Estilo Apple Large Text) --- */}
-      <section className="min-h-[70vh] flex flex-col items-center justify-center text-center bg-r-black px-4">
-        <h2 className="font-gta text-5xl md:text-8xl mb-8 max-w-4xl mx-auto leading-tight">
-            ¿LISTO PARA <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-r-yellow to-yellow-600">TOMAR EL CONTROL?</span>
-        </h2>
-        <button
-            onClick={() => navigate('/login')}
-            className="bg-white text-black font-gta text-2xl px-12 py-4 hover:bg-r-yellow hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-        >
-            INICIAR SESIÓN
-        </button>
-      </section>
-
-      {/* --- FOOTER --- */}
-      <footer className="bg-black py-12 border-t border-white/10 text-center">
-        <p className="text-white/30 font-gta text-sm tracking-widest">© 2026 ORDINARIA CONCURRENTE. ALL RIGHTS RESERVED.</p>
-      </footer>
-
-      {/* Overlay de ruido global */}
-      <div className="noise-overlay"></div>
-    </div>
-  );
-}
+            {/* Carrusel de Imágenes */}
+            <div className="carousel-track flex gap-8 pl-[40vw] pr-24 items-center h-full">
+                {facility.images.map((img, i) => (
+                    <div key={i} className="carousel-card relative w-[80vw] md:w-[600px] h-[60vh] flex-shrink-0 group overflow-hidden border border-white/10 bg-[#111]">
+                        <img
+                            src={img}
+                            alt={`${facility.title} ${i}`}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale group-hover:grayscale-0"
+                        />
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent
