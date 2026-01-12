@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Reseteo básico para la Landing */
+.landing-body {
+  font-family: 'Inter', sans-serif;
+  scroll-behavior: smooth;
+  background-color: black;
+  color: white;
+  overflow-x: hidden;
+}
+
+.sticky-section {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-reveal {
+  transition: all 0.1s linear;
+}
+
+/* Efecto Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px); /* Para Safari */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.text-glow {
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+}
+
+/* Ocultar barra de scroll en carrusel */
+.carousel-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE y Edge */
+}
+
+.carousel-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari y Opera */
+}
+
+.service-card {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.service-card:hover {
+  transform: scale(1.02);
+}
