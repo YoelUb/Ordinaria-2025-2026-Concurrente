@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
-import '../../styles/Landing.css';
+import '../../styles/LandingPage.css';
 
-export function Landing() {
+
+export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [showNav, setShowNav] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -36,12 +37,13 @@ export function Landing() {
     }
   };
 
+  // Servicios para el carrusel
   const services = [
     {
       id: 1,
       title: 'Pádel Court 1',
       subtitle: 'Pista Principal',
-      image: '/images/padel.jpg',
+      image: '/images/comunidad_1.jpg',
       specs: ['Iluminación LED', 'Superficie Pro', 'Vestuarios'],
       price: 'Desde 15€/hora'
     },
@@ -49,7 +51,7 @@ export function Landing() {
       id: 2,
       title: 'Pádel Court 2',
       subtitle: 'Pista Secundaria',
-      image: '/images/padel.jpg',
+      image: '/images/comunidad_2.jpg',
       specs: ['Iluminación LED', 'Césped Premium', 'Parking'],
       price: 'Desde 15€/hora'
     },
@@ -57,7 +59,7 @@ export function Landing() {
       id: 3,
       title: 'Piscina Climatizada',
       subtitle: 'Wellness Center',
-      image: '/images/piscina.jpg',
+      image: '/images/comunidad_3.jpg',
       specs: ['28°C constante', 'Sistema salino', 'Solárium'],
       price: 'Acceso incluido'
     },
@@ -65,7 +67,7 @@ export function Landing() {
       id: 4,
       title: 'Gimnasio Premium',
       subtitle: 'Fitness Studio',
-      image: '/images/gym.jpg',
+      image: '/images/comunidad_4.jpg',
       specs: ['24/7 Access', 'Equipamiento Pro', 'A/C'],
       price: 'Acceso incluido'
     },
@@ -73,7 +75,7 @@ export function Landing() {
       id: 5,
       title: 'Sala Común',
       subtitle: 'Event Space',
-      image: '/images/piscina.jpg',
+      image: '/images/comunidad_1.jpg',
       specs: ['Capacidad 50p', 'A/V System', 'Catering'],
       price: 'Bajo reserva'
     },
@@ -81,17 +83,65 @@ export function Landing() {
       id: 6,
       title: 'Zona Infantil',
       subtitle: 'Kids Area',
-      image: '/images/padel.jpg',
+      image: '/images/comunidad_2.jpg',
       specs: ['Supervisión', 'Juegos seguros', 'Aire libre'],
       price: 'Acceso libre'
     }
   ];
 
   return (
-    // Añadimos la clase "landing-body" que definimos en el CSS
-    <div className="landing-body">
+    <div className="bg-black text-white overflow-x-hidden">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { 
+          font-family: 'Inter', sans-serif;
+          scroll-behavior: smooth;
+        }
+        
+        .sticky-section {
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .image-reveal {
+          transition: all 0.1s linear;
+        }
+        
+        .glass {
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .text-glow {
+          text-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+        }
 
-      {/* Navegación Flotante */}
+        .carousel-container {
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .carousel-container::-webkit-scrollbar {
+          display: none;
+        }
+
+        .service-card {
+          transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .service-card:hover {
+          transform: scale(1.02);
+        }
+      `}</style>
+
+      {/* Floating Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
         <div className="glass px-6 py-4 mx-4 mt-4 rounded-full">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -119,9 +169,10 @@ export function Landing() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section - Estilo Apple */}
       <section ref={heroRef} className="relative h-[200vh]">
         <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden">
+          {/* Background Image con Zoom */}
           <div
             className="absolute inset-0"
             style={{
@@ -130,13 +181,14 @@ export function Landing() {
             }}
           >
             <img
-              src="/images/piscina.jpg"
+              src="/images/comunidad_1.jpg"
               alt="Luxury Building"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/80" />
           </div>
 
+          {/* Content que se desvanece */}
           <div
             className="relative z-10 text-center px-6 max-w-5xl"
             style={{
@@ -173,6 +225,7 @@ export function Landing() {
             </div>
           </div>
 
+          {/* Scroll Indicator */}
           <button
             onClick={() => scrollToSection('services')}
             className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce"
@@ -183,7 +236,7 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Carrusel */}
+      {/* Carrusel de Servicios */}
       <section id="services" className="py-32 px-6 bg-black">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
@@ -194,6 +247,7 @@ export function Landing() {
             </h2>
           </div>
 
+          {/* Controles del carrusel */}
           <div className="flex justify-end gap-3 mb-6">
             <button
               onClick={() => scrollCarousel('left')}
@@ -209,6 +263,7 @@ export function Landing() {
             </button>
           </div>
 
+          {/* Carrusel */}
           <div
             ref={carouselRef}
             className="carousel-container flex gap-6 pb-6"
@@ -255,16 +310,18 @@ export function Landing() {
             ))}
           </div>
 
+          {/* Indicador de scroll */}
           <div className="text-center mt-8">
             <p className="text-sm text-gray-500">← Desliza para ver más →</p>
           </div>
         </div>
       </section>
 
-      {/* Feature 1: Pádel */}
+      {/* Feature 1: Pádel - Imagen superpuesta estilo Apple */}
       <section id="facilities" ref={feature1Ref} className="relative h-[200vh]">
         <div className="sticky top-0 h-screen flex items-center justify-center px-6">
           <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+            {/* Texto */}
             <div
               className="z-20"
               style={{
@@ -290,9 +347,14 @@ export function Landing() {
                   <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                   Reserva por horas o franjas
                 </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Máximo 4 jugadores por reserva
+                </li>
               </ul>
             </div>
 
+            {/* Imagen con reveal */}
             <div
               className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl image-reveal"
               style={{
@@ -301,7 +363,7 @@ export function Landing() {
               }}
             >
               <img
-                src="/images/padel.jpg"
+                src="/images/comunidad_2.jpg"
                 alt="Padel Court"
                 className="w-full h-full object-cover"
               />
@@ -315,6 +377,7 @@ export function Landing() {
       <section ref={feature2Ref} className="relative h-[200vh] bg-gradient-to-b from-black to-gray-950">
         <div className="sticky top-0 h-screen flex items-center justify-center px-6">
           <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+            {/* Imagen primero en desktop */}
             <div
               className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl image-reveal order-2 md:order-1"
               style={{
@@ -323,13 +386,14 @@ export function Landing() {
               }}
             >
               <img
-                src="/images/piscina.jpg"
+                src="/images/comunidad_3.jpg"
                 alt="Pool"
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
             </div>
 
+            {/* Texto */}
             <div
               className="z-20 order-1 md:order-2"
               style={{
@@ -346,6 +410,20 @@ export function Landing() {
                 Disfruta todo el año de nuestra piscina climatizada con tecnología
                 de purificación salina y control de aforo inteligente.
               </p>
+              <ul className="space-y-3 text-gray-400">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Temperatura constante 28°C
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Sistema de purificación salina
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Reserva por turnos de 90 minutos
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -355,6 +433,7 @@ export function Landing() {
       <section ref={feature3Ref} className="relative h-[200vh] bg-gradient-to-b from-gray-950 to-black">
         <div className="sticky top-0 h-screen flex items-center justify-center px-6">
           <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+            {/* Texto */}
             <div
               className="z-20"
               style={{
@@ -371,8 +450,23 @@ export function Landing() {
                 Equipamiento de última generación en un espacio diseñado para tu bienestar.
                 Mancuernas, máquinas cardiovasculares y zona de estiramientos.
               </p>
+              <ul className="space-y-3 text-gray-400">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Acceso 24/7 para residentes
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Equipamiento profesional
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Ventilación y climatización óptima
+                </li>
+              </ul>
             </div>
 
+            {/* Imagen */}
             <div
               className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl image-reveal"
               style={{
@@ -381,7 +475,7 @@ export function Landing() {
               }}
             >
               <img
-                src="/images/gym.jpg"
+                src="/images/comunidad_4.jpg"
                 alt="Gym"
                 className="w-full h-full object-cover"
               />
@@ -391,7 +485,7 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Features Grid */}
+      {/* Features Grid - Beneficios */}
       <section id="features" className="py-32 px-6 bg-black">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-5xl md:text-7xl font-light text-center mb-20 leading-tight">
