@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,46 +6,177 @@
 
 :root {
   --rockstar-yellow: #FFAB00;
+  --apple-dark: #000000;
+  --apple-gray-1: #1D1D1F;
+  --apple-gray-2: #2C2C2E;
+  --apple-gray-3: #3A3A3C;
+  --apple-gray-4: #48484A;
+  --apple-gray-5: #636366;
+  --apple-gray-6: #8E8E93;
+  --apple-white: #F5F5F7;
+  --architectural-line: rgba(255, 255, 255, 0.1);
+  --grid-line: rgba(255, 255, 255, 0.05);
 }
 
-body {
-  background-color: #050505;
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
+/* Base mejorada con estilo Apple */
+body, html {
+  width: 100%;
+  max-width: 100vw;
   overflow-x: hidden;
+  background-color: var(--apple-dark);
+  color: var(--apple-white);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  scroll-behavior: smooth; /* Añadido aquí en lugar de en cada componente */
 }
 
-/* Tipografía estilo GTA */
-.font-gta {
-  font-family: 'Anton', sans-serif;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-/* Ruido cinematográfico */
-.noise-overlay {
+/* Fondo arquitectónico con gradientes sutiles */
+body::before {
+  content: '';
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(255, 171, 0, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 171, 0, 0.02) 0%, transparent 50%),
+    linear-gradient(180deg, var(--apple-dark) 0%, #0a0a0a 100%);
+  z-index: -2;
+}
+
+/* Líneas arquitectónicas sutiles */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 1px, var(--grid-line) 1px, var(--grid-line) 2px),
+    repeating-linear-gradient(90deg, transparent, transparent 1px, var(--grid-line) 1px, var(--grid-line) 2px);
+  background-size: 40px 40px;
   pointer-events: none;
-  z-index: 50;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+  z-index: -1;
+  opacity: 0.3;
 }
 
-/* Botón principal */
+/* CLASES NECESARIAS PARA EL LANDINGPAGE - AÑADIDAS */
+.text-glow {
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+}
+
+.image-reveal {
+  transition: all 0.1s linear;
+}
+
+.carousel-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.carousel-container::-webkit-scrollbar {
+  display: none;
+}
+
+.service-card {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.service-card:hover {
+  transform: scale(1.02);
+}
+
+.sticky-section {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tipografía estilo GTA Standard */
+.font-gta {
+  font-family: 'Anton', sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+/* Tipografía HERO */
+.font-gta-hero {
+  font-family: 'Anton', sans-serif;
+  text-transform: uppercase;
+  line-height: 0.85;
+  letter-spacing: 0.02em;
+}
+
+/* Fuente estilo Apple */
+.font-apple {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Botón principal - Estilo Apple refinado */
 .btn-primary {
-  @apply bg-rockstar-yellow text-black font-gta px-6 py-3 text-lg hover:bg-white transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply relative overflow-hidden font-apple px-8 py-4 text-lg rounded-none transition-all duration-500;
+  background: linear-gradient(135deg, var(--rockstar-yellow) 0%, #FFC107 100%);
+  color: #000;
+  border: none;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  box-shadow:
+    0 4px 14px 0 rgba(255, 171, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
-/* Botón secundario */
-.btn-ghost {
-  @apply border border-white/20 text-white font-gta px-6 py-3 text-lg hover:bg-white/10 transition-colors duration-300;
+.btn-primary:hover:not(:disabled) {
+  @apply transform -translate-y-1;
+  background: linear-gradient(135deg, #FFB300 0%, #FFCA28 100%);
+  box-shadow:
+    0 8px 20px 0 rgba(255, 171, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 /* Inputs */
 .input-field {
-  @apply w-full bg-white/5 border-b border-white/20 p-4 text-white placeholder-white/30 focus:outline-none focus:border-rockstar-yellow focus:bg-white/10 transition-all;
+  @apply w-full bg-transparent p-4 text-white placeholder-white/30 transition-all duration-300 font-apple;
+  border: none;
+  border-bottom: 1px solid var(--apple-gray-3);
+  letter-spacing: -0.01em;
+  font-weight: 400;
+}
+
+.input-field:focus {
+  @apply outline-none;
+  border-bottom-color: var(--rockstar-yellow);
+  background: linear-gradient(to bottom, transparent 95%, rgba(255, 171, 0, 0.1) 100%);
+}
+
+/* Efecto de vidrio - Ahora puedes usar Tailwind en su lugar */
+.glass-panel {
+  background: rgba(22, 22, 24, 0.7);
+  backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow:
+    0 20px 60px 0 rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--apple-gray-1); }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, var(--apple-gray-3), var(--apple-gray-4));
+  border-radius: 5px;
+  border: 2px solid var(--apple-gray-1);
 }

@@ -1,256 +1,567 @@
-import { useLayoutEffect, useRef } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Lock, Sparkles } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
-gsap.registerPlugin(ScrollTrigger);
+export default function LandingPage() {
+  const [scrollY, setScrollY] = useState(0);
+  const [showNav, setShowNav] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-const FACILITIES = [
-    {
-        id: 'padel',
-        category: "SPORT & WELLNESS",
-        title: "The Padel Club",
-        subtitle: "Competición de Alto Nivel",
-        desc: "Pistas panorámicas de cristal con iluminación técnica nocturna. Un espacio diseñado para el rendimiento deportivo en un entorno exclusivo.",
-        stats: ["Reserva Digital", "Acceso Biométrico", "Torneos"],
-        images: [
-            "/images/comunidad_1.jpg",
-            "/images/comunidad_2.jpg",
-            "/images/comunidad_3.jpg"
-        ]
-    },
-    {
-        id: 'pool',
-        category: "RELAXATION",
-        title: "Infinity Wellness",
-        subtitle: "Oasis Urbano",
-        desc: "Piscina climatizada con tecnología de purificación salina. Solárium privado y control de aforo en tiempo real para garantizar tu tranquilidad.",
-        stats: ["Climatizada", "Agua Salina", "Solárium"],
-        images: [
-            "/images/comunidad_4.jpg",
-            "/images/comunidad_4.jpg",
-            "/images/comunidad_4.jpg"
-        ]
-    },
-    {
-        id: 'gym',
-        category: "PERFORMANCE",
-        title: "Fitness Studio",
-        subtitle: "Entrenamiento Inteligente",
-        desc: "Equipamiento Technogym de última generación conectado a la nube. Espacios diáfanos con luz natural y monitorización de calidad del aire.",
-        stats: ["24/7 Access", "Technogym", "Yoga Zone"],
-        images: [
-            "/images/gym_1.jpg",
-            "/images/gym_2.jpg",
-            "/images/gym_3.jpg"
-        ]
+  const heroRef = useRef<HTMLDivElement>(null);
+  const feature1Ref = useRef<HTMLDivElement>(null);
+  const feature2Ref = useRef<HTMLDivElement>(null);
+  const feature3Ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+      setShowNav(window.scrollY > 400);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    if (carouselRef.current) {
+      const scrollAmount = 400;
+      carouselRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
     }
-];
+  };
 
-export function Landing() {
-    const comp = useRef(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const navigate = useNavigate();
+  // Servicios para el carrusel
+  const services = [
+    {
+      id: 1,
+      title: 'Pádel Court 1',
+      subtitle: 'Pista Principal',
+      image: '/images/comunidad_1.jpg',
+      specs: ['Iluminación LED', 'Superficie Pro', 'Vestuarios'],
+      price: 'Desde 15€/hora'
+    },
+    {
+      id: 2,
+      title: 'Pádel Court 2',
+      subtitle: 'Pista Secundaria',
+      image: '/images/comunidad_2.jpg',
+      specs: ['Iluminación LED', 'Césped Premium', 'Parking'],
+      price: 'Desde 15€/hora'
+    },
+    {
+      id: 3,
+      title: 'Piscina Climatizada',
+      subtitle: 'Wellness Center',
+      image: '/images/comunidad_3.jpg',
+      specs: ['28°C constante', 'Sistema salino', 'Solárium'],
+      price: 'Acceso incluido'
+    },
+    {
+      id: 4,
+      title: 'Gimnasio Premium',
+      subtitle: 'Fitness Studio',
+      image: '/images/comunidad_4.jpg',
+      specs: ['24/7 Access', 'Equipamiento Pro', 'A/C'],
+      price: 'Acceso incluido'
+    },
+    {
+      id: 5,
+      title: 'Sala Común',
+      subtitle: 'Event Space',
+      image: '/images/comunidad_1.jpg',
+      specs: ['Capacidad 50p', 'A/V System', 'Catering'],
+      price: 'Bajo reserva'
+    },
+    {
+      id: 6,
+      title: 'Zona Infantil',
+      subtitle: 'Kids Area',
+      image: '/images/comunidad_2.jpg',
+      specs: ['Supervisión', 'Juegos seguros', 'Aire libre'],
+      price: 'Acceso libre'
+    }
+  ];
 
-    useLayoutEffect(() => {
-        const ctx = gsap.context(() => {
-            // HERO ANIMATIONS
-            const tl = gsap.timeline();
-            tl.from(".hero-text-reveal", {
-                y: 100,
-                opacity: 0,
-                duration: 1.5,
-                stagger: 0.1,
-                ease: "power3.out"
-            })
-            .from(".hero-sub", {
-                opacity: 0,
-                y: 20,
-                duration: 1,
-                ease: "power2.out"
-            }, "-=1");
+  return (
+    <div className="bg-black text-white overflow-x-hidden">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        * { 
+          font-family: 'Inter', sans-serif;
+          scroll-behavior: smooth;
+        }
+        
+        .sticky-section {
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .image-reveal {
+          transition: all 0.1s linear;
+        }
 
-            // SCROLLYTELLING
-            const sections = gsap.utils.toArray(".facility-section");
+        .carousel-container {
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
 
-            sections.forEach((section: any) => {
-                const carousel = section.querySelector(".carousel-track");
-                const images = section.querySelectorAll(".parallax-img");
+        .carousel-container::-webkit-scrollbar {
+          display: none;
+        }
 
-                // Cálculo del ancho total para el scroll horizontal
-                const scrollWidth = carousel.scrollWidth - window.innerWidth + 150;
+        .service-card {
+          transition: transform 0.3s ease, opacity 0.3s ease;
+        }
 
-                gsap.to(carousel, {
-                    x: -scrollWidth,
-                    ease: "none",
-                    scrollTrigger: {
-                        trigger: section,
-                        start: "top top",
-                        end: () => `+=${scrollWidth + 1000}`,
-                        pin: true,
-                        scrub: 1,
-                        invalidateOnRefresh: true,
-                    }
-                });
+        .service-card:hover {
+          transform: scale(1.02);
+        }
+      `}</style>
 
-                // Parallax suave dentro de las cartas
-                images.forEach((img: any) => {
-                    gsap.fromTo(img,
-                        {scale: 1.1, x: 20},
-                        {
-                            scale: 1,
-                            x: -20,
-                            scrollTrigger: {
-                                trigger: section,
-                                start: "top top",
-                                end: `+=${scrollWidth + 1000}`,
-                                scrub: 1
-                            }
-                        }
-                    );
-                });
-            });
-
-        }, comp);
-
-        return () => ctx.revert();
-    }, []);
-
-    return (
-        <div ref={comp} className="bg-black text-slate-200 min-h-screen selection:bg-white/20 selection:text-white overflow-x-hidden">
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap');
-                .font-luxury { font-family: 'Playfair Display', serif; }
-                .font-sans-clean { font-family: 'Inter', sans-serif; }
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
-
-            {/* NAVBAR */}
-            <nav className="fixed top-0 w-full z-50 px-6 py-4 flex justify-between items-center transition-all duration-300">
-                <div className="absolute inset-0 bg-black/70 backdrop-blur-xl border-b border-white/5"/>
-                <div className="relative z-10 flex items-center gap-3">
-                    <div className="w-8 h-8 bg-white text-black flex items-center justify-center rounded-full">
-                        <span className="font-luxury font-bold text-lg">V</span>
-                    </div>
-                    <span className="font-sans-clean text-sm tracking-widest font-medium text-white/90">RESIDENCIAL</span>
-                </div>
-                <button
-                    onClick={() => navigate('/login')}
-                    className="relative z-10 group flex items-center gap-2 px-5 py-2 bg-white/10 hover:bg-white text-white hover:text-black backdrop-blur-md rounded-full border border-white/10 transition-all duration-300 font-sans-clean text-xs tracking-wide font-medium"
-                >
-                    <Lock size={14} className="group-hover:scale-90 transition-transform"/>
-                    AREA CLIENTES
-                </button>
-            </nav>
-
-            {/* HERO SECTION */}
-            <section className="relative h-screen w-full flex flex-col justify-center px-6 md:px-24">
-                <div className="absolute inset-0 -z-10">
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black"/>
-                    <img
-                        src="https://images.unsplash.com/photo-1600607686527-6fb886090705?auto=format&fit=crop&q=80"
-                        className="w-full h-full object-cover opacity-60"
-                        alt="Luxury Architecture"
-                    />
-                </div>
-
-                <div className="max-w-4xl pt-20">
-                    <div className="hero-sub flex items-center gap-3 mb-6">
-                        <div className="h-[1px] w-12 bg-[#D4AF37]"></div>
-                        <span className="text-[#D4AF37] font-sans-clean text-xs tracking-[0.2em] uppercase">Premium Living</span>
-                    </div>
-
-                    <h1 className="font-luxury text-6xl md:text-8xl lg:text-9xl leading-[1.1] text-white mix-blend-overlay opacity-90">
-                        <div className="overflow-hidden"><span className="hero-text-reveal inline-block">Beyond</span></div>
-                        <div className="overflow-hidden"><span className="hero-text-reveal inline-block italic font-light">Expectation.</span></div>
-                    </h1>
-
-                    <p className="hero-sub mt-8 max-w-lg text-lg text-white/70 font-sans-clean font-light leading-relaxed">
-                        Una experiencia residencial redefinida. Gestión integral, instalaciones de vanguardia y
-                        servicios exclusivos en una sola plataforma.
-                    </p>
-                </div>
-
-                <div className="absolute bottom-12 left-0 w-full flex justify-center">
-                    <div className="animate-bounce text-white/30">
-                        <ArrowRight className="rotate-90" size={20}/>
-                    </div>
-                </div>
-            </section>
-
-            <div ref={containerRef} className="bg-black">
-                {FACILITIES.map((facility) => (
-                    <section key={facility.id} className="facility-section relative h-screen w-full overflow-hidden flex flex-col justify-center bg-black border-t border-white/5">
-
-                        {/* Texto Fijo Izquierda */}
-                        <div className="absolute top-32 left-6 md:left-24 z-20 max-w-md pointer-events-none mix-blend-difference">
-                            <span className="font-sans-clean text-[#D4AF37] text-xs tracking-[0.3em] uppercase mb-4 block">
-                                {facility.category}
-                            </span>
-                            <h2 className="font-luxury text-5xl md:text-7xl mb-6 text-white leading-tight">
-                                {facility.title}
-                            </h2>
-                            <p className="text-white/70 font-sans-clean font-light text-base leading-relaxed mb-8 border-l border-white/20 pl-6">
-                                {facility.desc}
-                            </p>
-                            <div className="flex flex-wrap gap-4">
-                                {facility.stats.map(stat => (
-                                    <div key={stat} className="flex items-center gap-2 text-white/60">
-                                        <Sparkles size={12} className="text-[#D4AF37]"/>
-                                        <span className="font-sans-clean text-xs uppercase tracking-widest">{stat}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Carrusel de Imágenes */}
-                        <div className="carousel-track flex gap-12 pl-[45vw] pr-24 items-center h-full">
-                            {facility.images.map((img, i) => (
-                                <div key={i} className="carousel-card relative w-[75vw] md:w-[500px] aspect-[4/5] flex-shrink-0 group rounded-sm overflow-hidden">
-                                    <div className="absolute inset-0 overflow-hidden">
-                                        <img
-                                            src={img}
-                                            alt={`${facility.title} ${i}`}
-                                            className="parallax-img w-full h-full object-cover transition-transform duration-1000"
-                                        />
-                                    </div>
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"/>
-                                    <div className="absolute bottom-6 right-6 font-sans-clean text-xs text-white/50 tracking-widest">
-                                        0{i + 1}
-                                    </div>
-                                </div>
-                            ))}
-
-                            {/* Card Final */}
-                            <div className="carousel-card relative w-[300px] h-[400px] flex-shrink-0 flex items-center justify-center border border-white/10 rounded-sm hover:bg-white/5 transition-colors cursor-pointer group">
-                                <div className="text-center p-8">
-                                    <div className="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center mx-auto mb-4 group-hover:bg-[#D4AF37] group-hover:border-[#D4AF37] group-hover:text-black transition-all">
-                                        <ArrowRight size={20}/>
-                                    </div>
-                                    <p className="font-luxury text-xl mb-2">Explorar más</p>
-                                    <p className="font-sans-clean text-xs text-white/50">Ver disponibilidad</p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                ))}
+      {/* Floating Navigation */}
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+        <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 px-6 py-4 mx-4 mt-4 rounded-full">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                <span className="text-black font-bold text-sm">R</span>
+              </div>
+              <span className="font-semibold tracking-tight">RESIDENCIAL</span>
             </div>
 
-            {/* FOOTER */}
-            <footer className="py-24 bg-black border-t border-white/10 flex flex-col items-center justify-center text-center px-6">
-                <h3 className="font-luxury text-4xl mb-6">Experience the exceptional.</h3>
-                <button
-                    onClick={() => navigate('/login')}
-                    className="px-8 py-4 bg-white text-black rounded-full font-sans-clean text-sm font-medium hover:bg-[#D4AF37] hover:text-white transition-colors duration-300"
-                >
-                    Acceder a la Plataforma
-                </button>
-                <p className="mt-12 text-white/20 text-xs font-sans-clean tracking-widest uppercase">
-                    © 2026 Residencial Management System
-                </p>
-            </footer>
+            <div className="hidden md:flex gap-8 text-sm font-medium">
+              <button onClick={() => scrollToSection('services')} className="hover:text-gray-400 transition">Servicios</button>
+              <button onClick={() => scrollToSection('facilities')} className="hover:text-gray-400 transition">Instalaciones</button>
+              <button onClick={() => scrollToSection('features')} className="hover:text-gray-400 transition">Beneficios</button>
+            </div>
+
+            <button
+              onClick={() => window.location.href = '/login'}
+              className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-200 transition"
+            >
+              <Lock size={16} />
+              Acceder
+            </button>
+          </div>
         </div>
-    );
+      </nav>
+
+      {/* Hero Section - Estilo Apple */}
+      <section ref={heroRef} className="relative h-[200vh]">
+        <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden">
+          {/* Background Image con Zoom */}
+          <div
+            className="absolute inset-0"
+            style={{
+              transform: `scale(${1 + scrollY * 0.0003})`,
+              transition: 'transform 0.1s linear'
+            }}
+          >
+            <img
+              src="/images/comunidad_1.jpg"
+              alt="Luxury Building"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/80" />
+          </div>
+
+          {/* Content que se desvanece */}
+          <div
+            className="relative z-10 text-center px-6 max-w-5xl"
+            style={{
+              opacity: Math.max(0, 1 - scrollY * 0.003),
+              transform: `translateY(${scrollY * 0.5}px)`
+            }}
+          >
+            <p className="text-gray-400 text-sm tracking-[0.3em] uppercase mb-6 font-medium">
+              Sistema de Gestión Comunitaria
+            </p>
+
+            <h1 className="text-6xl md:text-8xl lg:text-[10rem] font-extralight mb-8 leading-[0.9] [text-shadow:_0_0_40px_rgba(255,255,255,0.3)]">
+              Elegancia.<br/>
+              <span className="font-semibold">Simplicidad.</span>
+            </h1>
+
+            <p className="text-xl md:text-2xl text-gray-300 font-light max-w-2xl mx-auto mb-12 leading-relaxed">
+              Gestiona reservas de instalaciones deportivas<br className="hidden md:block"/> con la experiencia que mereces.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => window.location.href = '/login'}
+                className="bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-200 transition shadow-2xl"
+              >
+                Comenzar ahora
+              </button>
+              <button
+                onClick={() => scrollToSection('services')}
+                className="bg-white/5 backdrop-blur-[20px] border border-white/10 px-8 py-4 rounded-full text-lg font-medium hover:bg-white/10 transition"
+              >
+                Descubrir más
+              </button>
+            </div>
+          </div>
+
+          {/* Scroll Indicator */}
+          <button
+            onClick={() => scrollToSection('services')}
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce"
+            style={{ opacity: Math.max(0, 1 - scrollY * 0.005) }}
+          >
+            <ArrowDown className="text-white/50" size={32} />
+          </button>
+        </div>
+      </section>
+
+      {/* Carrusel de Servicios */}
+      <section id="services" className="py-32 px-6 bg-black">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Explora nuestras instalaciones</p>
+            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">
+              Todos los servicios.<br/>
+              <span className="font-semibold">A tu alcance.</span>
+            </h2>
+          </div>
+
+          {/* Controles del carrusel */}
+          <div className="flex justify-end gap-3 mb-6">
+            <button
+              onClick={() => scrollCarousel('left')}
+              className="bg-white/5 backdrop-blur-[20px] border border-white/10 p-3 rounded-full hover:bg-white/10 transition"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button
+              onClick={() => scrollCarousel('right')}
+              className="bg-white/5 backdrop-blur-[20px] border border-white/10 p-3 rounded-full hover:bg-white/10 transition"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
+
+          {/* Carrusel */}
+          <div
+            ref={carouselRef}
+            className="carousel-container flex gap-6 pb-6"
+          >
+            {services.map((service) => (
+              <div
+                key={service.id}
+                className="service-card bg-white/5 backdrop-blur-[20px] border border-white/10 rounded-2xl overflow-hidden min-w-[350px] md:min-w-[400px] flex-shrink-0"
+              >
+                <div className="relative h-64 overflow-hidden">
+                  <img
+                    src={service.image}
+                    alt={service.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4">
+                    <p className="text-xs tracking-widest text-gray-400 mb-1 uppercase">{service.subtitle}</p>
+                    <h3 className="text-2xl font-semibold">{service.title}</h3>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="space-y-2 mb-4">
+                    {service.specs.map((spec, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm text-gray-400">
+                        <div className="w-1 h-1 bg-white/50 rounded-full"></div>
+                        {spec}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                    <span className="text-sm font-medium text-gray-400">{service.price}</span>
+                    <button
+                      onClick={() => window.location.href = '/reservations'}
+                      className="text-sm font-medium hover:text-gray-300 transition"
+                    >
+                      Reservar →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Indicador de scroll */}
+          <div className="text-center mt-8">
+            <p className="text-sm text-gray-500">← Desliza para ver más →</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature 1: Pádel - Imagen superpuesta estilo Apple */}
+      <section id="facilities" ref={feature1Ref} className="relative h-[200vh]">
+        <div className="sticky top-0 h-screen flex items-center justify-center px-6">
+          <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+            {/* Texto */}
+            <div
+              className="z-20"
+              style={{
+                opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 300)),
+                transform: `translateX(${Math.max(-50, -50 + (scrollY - 1500) / 10)}px)`
+              }}
+            >
+              <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Deporte Premium</p>
+              <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">
+                Pistas de<br/>
+                <span className="font-semibold">Pádel</span>
+              </h2>
+              <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">
+                Tres pistas profesionales con iluminación LED de última generación.
+                Superficie de juego premium y sistema de reserva inteligente.
+              </p>
+              <ul className="space-y-3 text-gray-400">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Iluminación nocturna profesional
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Reserva por horas o franjas
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Máximo 4 jugadores por reserva
+                </li>
+              </ul>
+            </div>
+
+            {/* Imagen con reveal */}
+            <div
+              className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl image-reveal"
+              style={{
+                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 1500) / 1500)})`,
+                opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 400))
+              }}
+            >
+              <img
+                src="/images/comunidad_2.jpg"
+                alt="Padel Court"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature 2: Piscina */}
+      <section ref={feature2Ref} className="relative h-[200vh] bg-gradient-to-b from-black to-gray-950">
+        <div className="sticky top-0 h-screen flex items-center justify-center px-6">
+          <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+            {/* Imagen primero en desktop */}
+            <div
+              className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl image-reveal order-2 md:order-1"
+              style={{
+                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
+                opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
+              }}
+            >
+              <img
+                src="/images/comunidad_3.jpg"
+                alt="Pool"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+            </div>
+
+            {/* Texto */}
+            <div
+              className="z-20 order-1 md:order-2"
+              style={{
+                opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 300)),
+                transform: `translateX(${Math.min(50, 50 - (scrollY - 2500) / 10)}px)`
+              }}
+            >
+              <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Wellness & Relax</p>
+              <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">
+                Piscina<br/>
+                <span className="font-semibold">Climatizada</span>
+              </h2>
+              <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">
+                Disfruta todo el año de nuestra piscina climatizada con tecnología
+                de purificación salina y control de aforo inteligente.
+              </p>
+              <ul className="space-y-3 text-gray-400">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Temperatura constante 28°C
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Sistema de purificación salina
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Reserva por turnos de 90 minutos
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature 3: Gimnasio */}
+      <section ref={feature3Ref} className="relative h-[200vh] bg-gradient-to-b from-gray-950 to-black">
+        <div className="sticky top-0 h-screen flex items-center justify-center px-6">
+          <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+            {/* Texto */}
+            <div
+              className="z-20"
+              style={{
+                opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 300)),
+                transform: `translateX(${Math.max(-50, -50 + (scrollY - 3500) / 10)}px)`
+              }}
+            >
+              <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Fitness & Training</p>
+              <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">
+                Gimnasio<br/>
+                <span className="font-semibold">Completo</span>
+              </h2>
+              <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">
+                Equipamiento de última generación en un espacio diseñado para tu bienestar.
+                Mancuernas, máquinas cardiovasculares y zona de estiramientos.
+              </p>
+              <ul className="space-y-3 text-gray-400">
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Acceso 24/7 para residentes
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Equipamiento profesional
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                  Ventilación y climatización óptima
+                </li>
+              </ul>
+            </div>
+
+            {/* Imagen */}
+            <div
+              className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl image-reveal"
+              style={{
+                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 3500) / 1500)})`,
+                opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 400))
+              }}
+            >
+              <img
+                src="/images/comunidad_4.jpg"
+                alt="Gym"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid - Beneficios */}
+      <section id="features" className="py-32 px-6 bg-black">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="text-5xl md:text-7xl font-light text-center mb-20 leading-tight">
+            Diseñado para<br/>
+            <span className="font-semibold">tu comodidad.</span>
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <Calendar size={32} />,
+                title: 'Reserva instantánea',
+                desc: 'Sistema intuitivo que permite reservar cualquier instalación en menos de 30 segundos desde tu móvil.'
+              },
+              {
+                icon: <Shield size={32} />,
+                title: 'Totalmente seguro',
+                desc: 'Autenticación robusta y protección de datos con encriptación de extremo a extremo.'
+              },
+              {
+                icon: <Clock size={32} />,
+                title: 'Siempre disponible',
+                desc: 'Accede y gestiona tus reservas 24/7 desde cualquier dispositivo, en cualquier lugar.'
+              }
+            ].map((feature, i) => (
+              <div key={i} className="bg-white/5 backdrop-blur-[20px] border border-white/10 p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 group">
+                <div className="text-white/70 mb-6 group-hover:scale-110 transition-transform">{feature.icon}</div>
+                <h3 className="text-2xl font-semibold mb-4">{feature.title}</h3>
+                <p className="text-gray-400 leading-relaxed font-light">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="py-32 px-6 bg-gradient-to-b from-black to-gray-950">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white/5 backdrop-blur-[20px] border border-white/10 p-16 rounded-3xl">
+            <div className="grid md:grid-cols-3 gap-12 text-center">
+              <div>
+                <div className="text-6xl md:text-7xl font-extralight mb-4">500+</div>
+                <p className="text-gray-400 text-lg font-light">Reservas mensuales</p>
+              </div>
+              <div>
+                <div className="text-6xl md:text-7xl font-extralight mb-4">98%</div>
+                <p className="text-gray-400 text-lg font-light">Tasa de satisfacción</p>
+              </div>
+              <div>
+                <div className="text-6xl md:text-7xl font-extralight mb-4">24/7</div>
+                <p className="text-gray-400 text-lg font-light">Disponibilidad total</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section id="cta" className="py-32 px-6 text-center bg-gradient-to-b from-gray-950 to-black">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight">
+            Tu experiencia<br/>
+            <span className="font-semibold">comienza aquí.</span>
+          </h2>
+          <p className="text-xl text-gray-400 mb-12 leading-relaxed font-light max-w-2xl mx-auto">
+            Únete a una comunidad que valora su tiempo y disfruta de instalaciones de primera clase con la mejor tecnología.
+          </p>
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="bg-white text-black px-12 py-5 rounded-full text-xl font-medium hover:bg-gray-200 transition shadow-2xl inline-flex items-center gap-3"
+          >
+            <Lock size={24} />
+            Acceder al sistema
+          </button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-12 px-6 bg-black">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos reservados.</p>
+          <div className="flex gap-6 text-sm text-gray-500 font-light">
+            <button className="hover:text-white transition">Privacidad</button>
+            <button className="hover:text-white transition">Términos</button>
+            <button className="hover:text-white transition">Soporte</button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
 }
