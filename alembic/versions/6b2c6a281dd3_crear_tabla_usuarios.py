@@ -24,15 +24,20 @@ def upgrade() -> None:
                     sa.Column('full_name', sa.String(), nullable=True),
                     sa.Column('email', sa.String(), nullable=False),
                     sa.Column('hashed_password', sa.String(), nullable=False),
-                    sa.Column('apartment', sa.String(), nullable=True),
                     sa.Column('phone', sa.String(), nullable=True),
+
+                    # --- Datos de vivienda (Añadidos) ---
+                    sa.Column('apartment', sa.String(), nullable=True),
+                    sa.Column('address', sa.String(), nullable=True),  # <--- NUEVO
+                    sa.Column('postal_code', sa.String(), nullable=True),  # <--- NUEVO
+                    # ------------------------------------
+
                     sa.Column('is_active', sa.Boolean(), nullable=True),
                     sa.Column('is_superuser', sa.Boolean(), nullable=True),
 
-                    # --- Columnas añadidas para la verificación ---
+                    # --- Verificación ---
                     sa.Column('verification_code', sa.String(), nullable=True),
                     sa.Column('verification_code_expires_at', sa.DateTime(timezone=True), nullable=True),
-                    # ----------------------------------------------
 
                     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
                     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),

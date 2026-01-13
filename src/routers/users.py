@@ -6,7 +6,8 @@ from src.db.session import get_db
 from src.models.user_model import User
 from src.schemas.user_schema import UserCreate, UserResponse
 from src.services.email import send_verification_email
-from src.core.security import get_password_hash, get_current_user
+from src.core.security import get_password_hash
+from src.core.deps import get_current_user
 
 router = APIRouter()
 
@@ -35,6 +36,8 @@ def create_user(
         full_name=user_in.full_name,
         apartment=user_in.apartment,
         phone=user_in.phone,
+        address=user_in.address,
+        postal_code=user_in.postal_code,
         is_active=False,
         verification_code=verification_code,
         verification_code_expires_at=code_expires
