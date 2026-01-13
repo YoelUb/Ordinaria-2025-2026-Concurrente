@@ -1,63 +1,127 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import timedelta, datetime
+import random
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, EmailStr
+
 from src.db.session import get_db
+from src.core.security import create_access_token, verify_password, get_password_hash
+from src.core.config import settings
 from src.models.user_model import User
-from src.core.security import get_password_hash
-from src.core.deps import get_current_user
-from src.schemas.user_schema import UserCreate, UserResponse, UserUpdate
+from src.schemas.token_schema import Token
+from src.services.firebase import verify_id_token
+from src.services.email import send_verification_email
 
 router = APIRouter()
 
-@router.post("/", response_model=UserResponse)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    """
-    Registra un nuevo usuario en la base de datos.
-    """
-    # Verificar si el email ya existe
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="El email ya está registrado")
 
-    # Crear el objeto usuario (hasheando la contraseña)
-    new_user = User(
-        email=user.email,
-        full_name=user.full_name,
-        hashed_password=get_password_hash(user.password),
-        apartment=user.apartment,
-        phone=user.phone,
-        is_active=user.is_active
+# Schemas locales para las peticiones
+class SocialLoginSchema(BaseModel):
+    token: str
+
+
+class VerificationSchema(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResendSchema(BaseModel):
+    email: EmailStr
+
+
+@router.post("/login", response_model=Token)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email o contraseña incorrectos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Bloquear si no está activo
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Cuenta no verificada. Revisa tu correo.")
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
     )
+    return {"access_token": access_token, "token_type": "bearer"}
 
-    # Guardar en BD
-    db.add(new_user)
+
+@router.post("/login/social", response_model=Token)
+def social_login(schema: SocialLoginSchema, db: Session = Depends(get_db)):
+    decoded_user = verify_id_token(schema.token)
+    if not decoded_user:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+    email = decoded_user.get("email")
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        new_user = User(
+            email=email,
+            full_name=decoded_user.get("name", "Usuario Nuevo"),
+            hashed_password=get_password_hash("social_login_pass"),
+            is_active=True
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        user = new_user
+
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# --- Endpoints de verificacion ---
+
+@router.post("/verify-email")
+def verify_email(schema: VerificationSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == schema.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if user.is_active:
+        return {"message": "El usuario ya estaba verificado"}
+
+    # Validar código y expiración
+    if not user.verification_code or user.verification_code != schema.code:
+        raise HTTPException(status_code=400, detail="Código inválido")
+
+    if user.verification_code_expires_at and user.verification_code_expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="El código ha expirado")
+
+    # Activar
+    user.is_active = True
+    user.verification_code = None
     db.commit()
-    db.refresh(new_user)
 
-    return new_user
+    return {"message": "Cuenta verificada con éxito"}
 
-@router.get("/me", response_model=UserResponse)
-def read_users_me(current_user: User = Depends(get_current_user)):
-    """
-    Obtiene el perfil del usuario actual autenticado.
-    Usa el token JWT enviado en el header 'Authorization'.
-    """
-    return current_user
 
-@router.put("/me", response_model=UserResponse)
-def update_user_me(
-    user_update: UserUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+@router.post("/resend-verification")
+def resend_verification(
+        schema: ResendSchema,
+        background_tasks: BackgroundTasks,
+        db: Session = Depends(get_db)
 ):
-    """Actualiza la información del perfil del usuario actual."""
-    if user_update.full_name is not None:
-        current_user.full_name = user_update.full_name
-    if user_update.phone is not None:
-        current_user.phone = user_update.phone
-    if user_update.apartment is not None:
-        current_user.apartment = user_update.apartment
+    user = db.query(User).filter(User.email == schema.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    db.add(current_user)
+    if user.is_active:
+        return {"message": "El usuario ya está verificado"}
+
+    # Generar nuevo código
+    code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    user.verification_code = code
+    user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
     db.commit()
-    db.refresh(current_user)
-    return current_user
+
+    # Enviar email
+    background_tasks.add_task(send_verification_email, user.email, code)
+
+    return {"message": "Código reenviado"}
