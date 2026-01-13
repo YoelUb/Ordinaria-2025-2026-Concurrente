@@ -1,34 +1,50 @@
-import {useEffect, useState, useRef} from 'react';
-import {ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight} from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; // Importamos useNavigate para la navegación
 
 export default function LandingPage() {
     const [scrollY, setScrollY] = useState(0);
     const [showNav, setShowNav] = useState(false);
     const carouselRef = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate(); // Inicializamos useNavigate
 
-    // Mantiene la lógica de detección de scroll para animaciones
+    // --- Lógica para redirección inteligente ---
+    // Si el usuario tiene sesión (token), va al Dashboard. Si no, al Login.
+    const handleReserveAction = () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Si hay token (está logueado) -> Ir al Dashboard
+            navigate('/dashboard');
+        } else {
+            // Si no hay token (no logueado) -> Ir al Login
+            navigate('/login');
+        }
+    };
+    // -----------------------------------------
+
+    // Mantiene la lógica de detección de scroll para las animaciones
     useEffect(() => {
         let ticking = false;
         const handleScroll = () => {
             if (!ticking) {
                 window.requestAnimationFrame(() => {
                     setScrollY(window.scrollY);
-                    setShowNav(window.scrollY > 400);
+                    setShowNav(window.scrollY > 400); // Muestra la barra de navegación tras 400px de scroll
                     ticking = false;
                 });
                 ticking = true;
             }
         };
-        window.addEventListener('scroll', handleScroll, {passive: true});
+        window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Función para navegación suave a secciones
+    // Función para navegación suave ("smooth scroll") a las secciones de la página
     const scrollToSection = (id: string) => {
-        document.getElementById(id)?.scrollIntoView({behavior: 'smooth'});
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // Lógica del carrusel de servicios
+    // Lógica del carrusel de servicios (desplazamiento horizontal)
     const scrollCarousel = (direction: 'left' | 'right') => {
         if (carouselRef.current) {
             carouselRef.current.scrollBy({
@@ -91,9 +107,6 @@ export default function LandingPage() {
 
     return (
         <div className="bg-black text-white overflow-x-hidden">
-            {/* Nota: La etiqueta <style> se ha eliminado.
-                Los estilos .glass, .text-glow, fuentes y scrollbar ahora se cargan desde index.css */}
-
             <nav
                 className={`fixed top-0 w-full z-50 transition-all duration-500 ${showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
                 <div className="glass px-6 py-4 mx-4 mt-4 rounded-full">
@@ -105,17 +118,18 @@ export default function LandingPage() {
                         </div>
                         <div className="hidden md:flex gap-8 text-sm font-medium">
                             <button onClick={() => scrollToSection('services')}
-                                    className="hover:text-gray-400 transition">Servicios
+                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Servicios
                             </button>
                             <button onClick={() => scrollToSection('facilities')}
-                                    className="hover:text-gray-400 transition">Instalaciones
+                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Instalaciones
                             </button>
                             <button onClick={() => scrollToSection('features')}
-                                    className="hover:text-gray-400 transition">Beneficios
+                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Beneficios
                             </button>
                         </div>
-                        <button onClick={() => window.location.href = '/login'}
-                                className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-200 transition">
+                        {/* Botón Acceder: Usa la redirección inteligente */}
+                        <button onClick={handleReserveAction}
+                                className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-200 transition cursor-pointer border-none">
                             <Lock size={16}/>Acceder
                         </button>
                     </div>
@@ -142,18 +156,19 @@ export default function LandingPage() {
                             reservas de instalaciones deportivas<br className="hidden md:block"/> con la experiencia que
                             mereces.</p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button onClick={() => window.location.href = '/login'}
-                                    className="bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-200 transition shadow-2xl">Comenzar
+                            {/* Botón Comenzar ahora: Usa la redirección inteligente */}
+                            <button onClick={handleReserveAction}
+                                    className="bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-200 transition shadow-2xl cursor-pointer border-none">Comenzar
                                 ahora
                             </button>
                             <button onClick={() => scrollToSection('services')}
-                                    className="glass px-8 py-4 rounded-full text-lg font-medium hover:bg-white/10 transition">Descubrir
+                                    className="glass px-8 py-4 rounded-full text-lg font-medium hover:bg-white/10 transition cursor-pointer text-white border border-white/10">Descubrir
                                 más
                             </button>
                         </div>
                     </div>
                     <button onClick={() => scrollToSection('services')}
-                            className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce"
+                            className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce bg-transparent border-none cursor-pointer"
                             style={{opacity: Math.max(0, 1 - scrollY * 0.005)}}><ArrowDown className="text-white/50"
                                                                                            size={32}/></button>
                 </div>
@@ -169,16 +184,16 @@ export default function LandingPage() {
                     </div>
                     <div className="flex justify-end gap-3 mb-6">
                         <button onClick={() => scrollCarousel('left')}
-                                className="glass p-3 rounded-full hover:bg-white/10 transition"><ChevronLeft size={24}/>
+                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"><ChevronLeft size={24}/>
                         </button>
                         <button onClick={() => scrollCarousel('right')}
-                                className="glass p-3 rounded-full hover:bg-white/10 transition"><ChevronRight
+                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"><ChevronRight
                             size={24}/></button>
                     </div>
-                    <div ref={carouselRef} className="carousel-container flex gap-6 pb-6">
+                    <div ref={carouselRef} className="carousel-container flex gap-6 pb-6 overflow-x-auto scrollbar-hide">
                         {services.map((s) => (
                             <div key={s.id}
-                                 className="service-card glass rounded-2xl overflow-hidden min-w-[350px] md:min-w-[400px] flex-shrink-0">
+                                 className="service-card glass rounded-2xl overflow-hidden min-w-[350px] md:min-w-[400px] flex-shrink-0 border border-white/10">
                                 <div className="relative h-64 overflow-hidden">
                                     <img src={s.image} alt={s.title} className="w-full h-full object-cover"
                                          loading="lazy"/>
@@ -196,9 +211,11 @@ export default function LandingPage() {
                                             {sp}</div>))}</div>
                                     <div className="flex justify-between items-center pt-4 border-t border-white/10">
                                         <span className="text-sm font-medium text-gray-400">{s.price}</span>
-                                        <button onClick={() => window.location.href = '/reservations'}
-                                                className="text-sm font-medium hover:text-gray-300 transition">Reservar
-                                            →
+                                        {/* Botón Reservar: Usa la redirección inteligente */}
+                                        <button
+                                            onClick={handleReserveAction}
+                                            className="text-sm font-medium hover:text-gray-300 transition cursor-pointer bg-transparent border-none text-white">
+                                            Reservar →
                                         </button>
                                     </div>
                                 </div>
@@ -210,6 +227,7 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* SECCIONES INTERMEDIAS (Visuales - Sin cambios lógicos) */}
             <section id="facilities" className="relative h-[200vh]">
                 <div className="sticky top-0 h-screen flex items-center justify-center px-6">
                     <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
@@ -358,7 +376,7 @@ export default function LandingPage() {
                             }
                         ].map((f, i) => (
                             <div key={i}
-                                 className="glass p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 group">
+                                 className="glass p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 group border border-white/10">
                                 <div
                                     className="text-white/70 mb-6 group-hover:scale-110 transition-transform">{f.icon}</div>
                                 <h3 className="text-2xl font-semibold mb-4">{f.title}</h3>
@@ -371,7 +389,7 @@ export default function LandingPage() {
 
             <section className="py-32 px-6 bg-gradient-to-b from-black to-gray-950">
                 <div className="max-w-7xl mx-auto">
-                    <div className="glass p-16 rounded-3xl">
+                    <div className="glass p-16 rounded-3xl border border-white/10">
                         <div className="grid md:grid-cols-3 gap-12 text-center">
                             <div>
                                 <div className="text-6xl md:text-7xl font-extralight mb-4">500+</div>
@@ -392,10 +410,10 @@ export default function LandingPage() {
                     <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight">Tu experiencia<br/><span
                         className="font-semibold">comienza aquí.</span></h2>
                     <p className="text-xl text-gray-400 mb-12 leading-relaxed font-light max-w-2xl mx-auto">Únete a una
-                        comunidad que valora su tiempo y disfruta de instalaciones de primera clase con la mejor
-                        tecnología.</p>
-                    <button onClick={() => window.location.href = '/login'}
-                            className="bg-white text-black px-12 py-5 rounded-full text-xl font-medium hover:bg-gray-200 transition shadow-2xl inline-flex items-center gap-3">
+                        comunidad que valora su tiempo y disfruta de instalaciones de primera clase.</p>
+                    {/* Botón Acceder al sistema: Usa la redirección inteligente */}
+                    <button onClick={handleReserveAction}
+                            className="bg-white text-black px-12 py-5 rounded-full text-xl font-medium hover:bg-gray-200 transition shadow-2xl inline-flex items-center gap-3 cursor-pointer border-none">
                         <Lock size={24}/>Acceder al sistema
                     </button>
                 </div>
@@ -407,13 +425,13 @@ export default function LandingPage() {
                     reservados.</p>
                     <div className="flex gap-6 text-sm text-gray-500 font-light">
                         <button onClick={() => window.location.href = '/privacy'}
-                                className="hover:text-white transition bg-transparent border-none cursor-pointer">Privacidad
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Privacidad
                         </button>
                         <button onClick={() => window.location.href = '/terms'}
-                                className="hover:text-white transition bg-transparent border-none cursor-pointer">Términos
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Términos
                         </button>
                         <button onClick={() => window.location.href = '/support'}
-                                className="hover:text-white transition bg-transparent border-none cursor-pointer">Soporte
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Soporte
                         </button>
                     </div>
                 </div>

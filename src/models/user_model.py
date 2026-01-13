@@ -11,8 +11,11 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
 
+    # Datos de contacto y casa
     apartment = Column(String, nullable=True)
     phone = Column(String, nullable=True)
+    address = Column(String, nullable=True)
+    postal_code = Column(String, nullable=True)
 
     # Por defecto inactivo hasta que verifique
     is_active = Column(Boolean, default=False)

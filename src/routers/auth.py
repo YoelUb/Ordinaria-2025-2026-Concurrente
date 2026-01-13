@@ -1,10 +1,9 @@
-from datetime import timedelta, datetime
 import random
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
-
+from datetime import timedelta, datetime, timezone
 from src.db.session import get_db
 from src.core.security import create_access_token, verify_password, get_password_hash
 from src.core.config import settings
@@ -89,7 +88,7 @@ def verify_email(schema: VerificationSchema, db: Session = Depends(get_db)):
     if not user.verification_code or user.verification_code != schema.code:
         raise HTTPException(status_code=400, detail="Código inválido")
 
-    if user.verification_code_expires_at and user.verification_code_expires_at < datetime.utcnow():
+    if user.verification_code_expires_at and user.verification_code_expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="El código ha expirado")
 
     # Activar usuario
@@ -116,7 +115,7 @@ def resend_verification(
     # Generar nuevo código
     code = "".join([str(random.randint(0, 9)) for _ in range(6)])
     user.verification_code = code
-    user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    user.verification_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
     db.commit()
 
     # Enviar email

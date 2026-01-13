@@ -4,7 +4,6 @@ from datetime import datetime
 import re
 
 # Reglas de validación
-# Mismos patrones que en el frontend para consistencia
 PHONE_REGEX = r'^\+?[0-9]{9,15}$'
 PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{8,}$'
 
@@ -14,22 +13,19 @@ class UserBase(BaseModel):
     full_name: Optional[str] = Field(None, min_length=3, description="Nombre completo (min 3 letras)")
     apartment: Optional[str] = Field(None, min_length=1, description="Apartamento (ej: 4B)")
     phone: Optional[str] = None
+    address: Optional[str] = None
+    postal_code: Optional[str] = None
+
     is_active: bool = True
 
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        """Limpia y valida el teléfono si se proporciona."""
         if not v:
             return v
-
-        # Quitamos espacios y guiones que el usuario pueda haber puesto
         clean_phone = re.sub(r'[\s-]', '', v)
-
-        # Validación
         if not re.match(PHONE_REGEX, clean_phone):
             raise ValueError('El teléfono debe tener entre 9 y 15 dígitos.')
-
         return clean_phone
 
 
@@ -39,7 +35,6 @@ class UserCreate(UserBase):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        """Asegura complejidad mínima en la contraseña."""
         if not re.match(PASSWORD_REGEX, v):
             raise ValueError(
                 'La contraseña es débil: requiere mín. 8 caracteres, '
@@ -57,10 +52,11 @@ class UserResponse(UserBase):
 
 
 class UserUpdate(BaseModel):
-    # Repetimos validaciones porque en Update los campos son opcionales pero deben ser válidos si se envían
     full_name: Optional[str] = Field(None, min_length=3)
     apartment: Optional[str] = Field(None, min_length=1)
     phone: Optional[str] = None
+    address: Optional[str] = None
+    postal_code: Optional[str] = None
 
     @field_validator('phone')
     @classmethod

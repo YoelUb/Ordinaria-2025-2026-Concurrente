@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{8,}$/;
 const NAME_REGEX = /^[a-zA-ZÀ-ÿ\s]+$/;
-const APARTMENT_REGEX = /^\d+\s*[a-zA-Z]+$/;
+// Acepta número, espacio opcional y letra
+const APARTMENT_REGEX = /^\d+\s*[A-Z]+$/;
 const POSTAL_CODE_REGEX = /^\d{5}$/;
 
 // Tipo para las sugerencias de Photon
@@ -51,11 +52,11 @@ export default function RegisterPage() {
     const [addressSuggestions, setAddressSuggestions] = useState<PhotonFeature[]>([]);
     const [showAddressMenu, setShowAddressMenu] = useState(false);
     const [loadingAddress, setLoadingAddress] = useState(false);
-    const wrapperRef = useRef<HTMLDivElement>(null); // Para detectar clicks fuera
+    const wrapperRef = useRef<HTMLDivElement>(null);
 
     // --- Lógica de Autocompletado (Photon) ---
     useEffect(() => {
-        // Solo buscamos si hay más de 3 letras y el menú está "activo" (no acabamos de seleccionar)
+        // Solo buscamos si hay más de 3 letras y el menú está activo
         if (formData.address.length < 3 || !showAddressMenu) {
             setAddressSuggestions([]);
             return;
@@ -64,12 +65,17 @@ export default function RegisterPage() {
         const timeoutId = setTimeout(async () => {
             setLoadingAddress(true);
             try {
-                // Buscamos en español (&lang=es) y limitamos a 5 resultados
+                // NOTA: Quitamos &lang=es para evitar errores 400 en la API pública
                 const response = await fetch(
-                    `https://photon.komoot.io/api/?q=${encodeURIComponent(formData.address)}&limit=5&lang=es`
+                    `https://photon.komoot.io/api/?q=${encodeURIComponent(formData.address)}&limit=5`
                 );
-                const data = await response.json();
-                setAddressSuggestions(data.features || []);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    setAddressSuggestions(data.features || []);
+                } else {
+                    console.error("Error API Photon:", response.status);
+                }
             } catch (error) {
                 console.error("Error buscando dirección:", error);
             } finally {
@@ -91,11 +97,10 @@ export default function RegisterPage() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Función para seleccionar una dirección
+    // Función para seleccionar una dirección de la lista (Garantiza dirección real)
     const handleSelectAddress = (feature: PhotonFeature) => {
         const p = feature.properties;
 
-        // Construimos un string legible: "Calle Principal 12, Ciudad"
         const streetPart = p.street || p.name || "";
         const numberPart = p.housenumber ? ` ${p.housenumber}` : "";
         const cityPart = p.city ? `, ${p.city}` : "";
@@ -105,45 +110,59 @@ export default function RegisterPage() {
         setFormData(prev => ({
             ...prev,
             address: fullAddress,
-            // Si la API nos devuelve el CP, lo rellenamos automáticamente
+            // Si la API devuelve el CP, lo rellenamos
             postalCode: p.postcode || prev.postalCode
         }));
 
-        // Limpiamos errores si los hubiera
-        if (errors.address) setErrors(prev => ({...prev, address: ''}));
-        if (p.postcode && errors.postalCode) setErrors(prev => ({...prev, postalCode: ''}));
+        // Limpiamos errores relacionados
+        setErrors(prev => ({
+            ...prev,
+            address: '',
+            postalCode: p.postcode ? '' : prev.postalCode
+        }));
 
-        setAddressSuggestions([]); // Cerrar menú
-        setShowAddressMenu(false); // Evitar que vuelva a buscar inmediatamente
+        setAddressSuggestions([]);
+        setShowAddressMenu(false);
     };
 
     // --- Validación de formulario ---
     const validateForm = () => {
         const newErrors: { [key: string]: string } = {};
 
+        // Nombre
         if (!formData.name.trim() || formData.name.length < 3) {
             newErrors.name = "Mínimo 3 caracteres.";
         } else if (!NAME_REGEX.test(formData.name)) {
             newErrors.name = "El nombre no puede contener números.";
         }
 
-        if (!formData.address.trim()) newErrors.address = "La dirección es obligatoria.";
+        // Dirección (Validamos longitud mínima para asegurar algo "real")
+        if (!formData.address.trim()) {
+            newErrors.address = "La dirección es obligatoria.";
+        } else if (formData.address.length < 5) {
+            newErrors.address = "Dirección demasiado corta.";
+        }
 
+        // Código Postal
         if (!POSTAL_CODE_REGEX.test(formData.postalCode)) {
             newErrors.postalCode = "Código postal inválido (5 dígitos).";
         }
 
+        // Apartamento (Número y Letra Mayúscula)
         if (!formData.apartment.trim()) {
-            newErrors.apartment = "El apartamento es obligatorio.";
+            newErrors.apartment = "Obligatorio.";
         } else if (!APARTMENT_REGEX.test(formData.apartment)) {
-            newErrors.apartment = "Formato inválido (Ej: 4B, 12A).";
+            newErrors.apartment = "Formato: Nº y Letra (Ej: 4B).";
         }
 
-        if (!EMAIL_REGEX.test(formData.email)) newErrors.email = "Introduce un email válido.";
+        // Email
+        if (!EMAIL_REGEX.test(formData.email)) newErrors.email = "Email inválido.";
 
+        // Teléfono
         const cleanPhone = formData.phone.replace(/[\s-]/g, '');
         if (!/^\+?[0-9]{9,15}$/.test(cleanPhone)) newErrors.phone = "Teléfono inválido.";
 
+        // Password
         if (!PASSWORD_REGEX.test(formData.password)) {
             newErrors.password = "Mínimo 8 caracteres, mayúscula, minúscula y número.";
         }
@@ -157,19 +176,27 @@ export default function RegisterPage() {
     };
 
     const handleChange = (field: string, value: string) => {
-        setFormData(prev => ({...prev, [field]: value}));
+        let finalValue = value;
 
-        // Si editamos la dirección, reactivamos el menú de sugerencias
+        // --- LÓGICA DE MAYÚSCULAS PARA APARTAMENTO ---
+        if (field === 'apartment') {
+            finalValue = value.toUpperCase();
+        }
+
+        setFormData(prev => ({...prev, [field]: finalValue}));
+
+        // Si editamos la dirección, activamos el menú
         if (field === 'address') {
             setShowAddressMenu(true);
         }
 
+        // Limpiar error al escribir
         if (errors[field]) {
             setErrors(prev => ({...prev, [field]: ''}));
         }
     };
 
-    // --- Lógica de envío y Social Login (Backend) ---
+    // --- Backend & Social Login ---
     const authenticateWithBackendSocial = async (firebaseToken: string) => {
         try {
             const response = await fetch('http://localhost:8000/api/v1/auth/login/social', {
@@ -331,9 +358,9 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* FILA 2: DIRECCIÓN (AUTOCOMPLETE) Y CP */}
+                        {/* Direccion con autocompletado */}
                         <div className="grid md:grid-cols-3 gap-6">
-                            {/* INPUT DE DIRECCIÓN CON PHOTON */}
+                            {/* input direccion con photon */}
                             <div className="md:col-span-2 relative" ref={wrapperRef}>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">Dirección</label>
                                 <div className="relative">
@@ -356,7 +383,7 @@ export default function RegisterPage() {
                                     )}
                                 </div>
 
-                                {/* DESPLEGABLE DE SUGERENCIAS */}
+                                {/* Desplegable con sugerencias*/}
                                 {addressSuggestions.length > 0 && (
                                     <ul className="absolute z-50 w-full mt-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto scrollbar-hide">
                                         {addressSuggestions.map((item, index) => {
@@ -382,7 +409,7 @@ export default function RegisterPage() {
                                 {errors.address && <div className="text-red-300 text-sm mt-1 ml-1 flex gap-1"><AlertCircle size={14}/> {errors.address}</div>}
                             </div>
 
-                            {/* CÓDIGO POSTAL */}
+                            {/* Codigo postal */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">C. Postal</label>
                                 <div className="relative">
@@ -400,7 +427,7 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* FILA 3: APARTAMENTO Y EMAIL */}
+                        {/* Casa y correo */}
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">Apartamento (Nº y Letra)</label>
@@ -420,7 +447,7 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* FILA 4: CONTRASEÑAS */}
+                        {/* Contraseñas doble*/}
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">Contraseña</label>
@@ -446,7 +473,7 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* TÉRMINOS Y BOTÓN */}
+                        {/* Terminos, politicas y boton*/}
                         <div className="pt-4">
                             <label className="flex items-start gap-3 cursor-pointer group">
                                 <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="w-5 h-5 rounded border-gray-600 bg-transparent cursor-pointer mt-0.5 accent-white"/>

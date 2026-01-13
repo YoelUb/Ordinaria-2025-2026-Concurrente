@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import random
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -27,7 +27,7 @@ def create_user(
 
     # Generar código de verificación
     verification_code = "".join([str(random.randint(0, 9)) for _ in range(6)])
-    code_expires = datetime.utcnow() + timedelta(minutes=15)
+    code_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     # Crear usuario
     new_user = User(
