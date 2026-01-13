@@ -1,127 +1,57 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 import random
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
-
 from src.db.session import get_db
-from src.core.security import create_access_token, verify_password, get_password_hash
-from src.core.config import settings
 from src.models.user_model import User
-from src.schemas.token_schema import Token
-from src.services.firebase import verify_id_token
+from src.schemas.user_schema import UserCreate, UserResponse
 from src.services.email import send_verification_email
+from src.core.security import get_password_hash, get_current_user
 
 router = APIRouter()
 
-
-# Schemas locales para las peticiones
-class SocialLoginSchema(BaseModel):
-    token: str
-
-
-class VerificationSchema(BaseModel):
-    email: EmailStr
-    code: str
-
-
-class ResendSchema(BaseModel):
-    email: EmailStr
-
-
-@router.post("/login", response_model=Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email o contraseña incorrectos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    # Bloquear si no está activo
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Cuenta no verificada. Revisa tu correo.")
-
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-@router.post("/login/social", response_model=Token)
-def social_login(schema: SocialLoginSchema, db: Session = Depends(get_db)):
-    decoded_user = verify_id_token(schema.token)
-    if not decoded_user:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    email = decoded_user.get("email")
-    user = db.query(User).filter(User.email == email).first()
-
-    if not user:
-        new_user = User(
-            email=email,
-            full_name=decoded_user.get("name", "Usuario Nuevo"),
-            hashed_password=get_password_hash("social_login_pass"),
-            is_active=True
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        user = new_user
-
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-# --- Endpoints de verificacion ---
-
-@router.post("/verify-email")
-def verify_email(schema: VerificationSchema, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == schema.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-
-    if user.is_active:
-        return {"message": "El usuario ya estaba verificado"}
-
-    # Validar código y expiración
-    if not user.verification_code or user.verification_code != schema.code:
-        raise HTTPException(status_code=400, detail="Código inválido")
-
-    if user.verification_code_expires_at and user.verification_code_expires_at < datetime.utcnow():
-        raise HTTPException(status_code=400, detail="El código ha expirado")
-
-    # Activar
-    user.is_active = True
-    user.verification_code = None
-    db.commit()
-
-    return {"message": "Cuenta verificada con éxito"}
-
-
-@router.post("/resend-verification")
-def resend_verification(
-        schema: ResendSchema,
-        background_tasks: BackgroundTasks,
-        db: Session = Depends(get_db)
+@router.post("/", response_model=UserResponse)
+def create_user(
+    user_in: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == schema.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Verificar si el email ya existe
+    user = db.query(User).filter(User.email == user_in.email).first()
+    if user:
+        raise HTTPException(
+            status_code=400,
+            detail="El email ya está registrado en el sistema."
+        )
 
-    if user.is_active:
-        return {"message": "El usuario ya está verificado"}
+    # Generar código de verificación
+    verification_code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    code_expires = datetime.utcnow() + timedelta(minutes=15)
 
-    # Generar nuevo código
-    code = "".join([str(random.randint(0, 9)) for _ in range(6)])
-    user.verification_code = code
-    user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    # Crear usuario
+    new_user = User(
+        email=user_in.email,
+        hashed_password=get_password_hash(user_in.password),
+        full_name=user_in.full_name,
+        apartment=user_in.apartment,
+        phone=user_in.phone,
+        is_active=False,
+        verification_code=verification_code,
+        verification_code_expires_at=code_expires
+    )
+
+    db.add(new_user)
     db.commit()
+    db.refresh(new_user)
 
-    # Enviar email
-    background_tasks.add_task(send_verification_email, user.email, code)
+    # Enviar correo
+    background_tasks.add_task(send_verification_email, new_user.email, verification_code)
 
-    return {"message": "Código reenviado"}
+    return new_user
+
+@router.get("/me", response_model=UserResponse)
+def read_users_me(current_user: User = Depends(get_current_user)):
+    """
+    Obtener el perfil del usuario logueado.
+    """
+    return current_user

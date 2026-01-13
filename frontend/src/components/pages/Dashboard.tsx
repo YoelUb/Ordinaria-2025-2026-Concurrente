@@ -1,401 +1,392 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // <--- Importante: useNavigate
-import { Calendar, User, Settings, LogOut, Home, Plus, X, Loader2 } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // Importamos el hook de navegación
+import { ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface Reservation {
-  id: number;
-  facility_id: string;
-  reservation_date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-}
+export default function LandingPage() {
+    const navigate = useNavigate(); // Inicializamos el hook
+    const [scrollY, setScrollY] = useState(0);
+    const [showNav, setShowNav] = useState(false);
+    const carouselRef = useRef<HTMLDivElement>(null);
 
-interface UserProfile {
-  full_name: string;
-  email: string;
-  apartment: string;
-  phone: string;
-}
-
-export default function Dashboard() {
-  const navigate = useNavigate(); // Hook para redirigir
-  const [activeTab, setActiveTab] = useState('home');
-  const [showReserveModal, setShowReserveModal] = useState(false);
-
-  // --- Estados de datos ---
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // --- Formulario de reserva ---
-  const [newResFacility, setNewResFacility] = useState('Padel 1');
-  const [newResDate, setNewResDate] = useState('');
-  const [newResTime, setNewResTime] = useState('09:00');
-
-  // Cargar datos al iniciar
-  useEffect(() => {
-    const fetchData = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = '/login';
-        return;
-      }
-
-      try {
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        };
-
-        // 1. Obtener perfil
-        const userResponse = await fetch('http://localhost:8000/api/v1/users/me', { headers });
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          setUser(userData);
+    const handleReserveAction = () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Si hay token, asumimos que está logueado -> Dashboard
+            navigate('/dashboard');
+        } else {
+            // Si no, al login
+            navigate('/login');
         }
-
-        // 2. Obtener reservas existentes
-        const resResponse = await fetch('http://localhost:8000/api/v1/reservations/', { headers });
-        if (resResponse.ok) {
-          const resData = await resResponse.json();
-          setReservations(resData);
-        }
-
-      } catch (error) {
-        console.error("Error cargando datos:", error);
-      } finally {
-        setLoading(false);
-      }
     };
 
-    fetchData();
-  }, []);
+    useEffect(() => {
+        let ticking = false;
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    setScrollY(window.scrollY);
+                    setShowNav(window.scrollY > 400);
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
-  // Función de Logout
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
-  };
+    const scrollToSection = (id: string) => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    };
 
-  // --- LOGICA DE REDIRECCIÓN AL PAGO ---
-  const handleCreateReservation = () => {
-    if (!newResDate || !newResTime) {
-      alert("Por favor selecciona fecha y hora");
-      return;
-    }
-
-    // 1. Calcular fechas exactas (Backend necesita ISO format)
-    const startDateTime = new Date(`${newResDate}T${newResTime}:00`);
-
-    // Asumimos reserva de 1.5 horas (90 minutos) para el ejemplo
-    const durationMinutes = 90;
-    const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60000);
-
-    // Formatear hora fin para mostrarla
-    const endTimeString = `${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`;
-
-    // 2. Formatear datos para visualización (Ticket)
-    const displayDate = startDateTime.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-    const displayTime = `${newResTime} - ${endTimeString}`;
-
-    // 3. Calcular Precio (Simulado)
-    const price = 15.00;
-    const tax = price * 0.21;
-    const total = price + tax;
-
-    // 4. CERRAR MODAL Y REDIRIGIR AL PAGO
-    setShowReserveModal(false);
-
-    navigate('/payment', {
-      state: {
-        // Datos crudos para el backend
-        reservationData: {
-          facility: newResFacility,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-        },
-        // Datos bonitos para el usuario
-        displayData: {
-          facility: newResFacility,
-          date: displayDate,
-          time: displayTime,
-          duration: '1 hora 30 min',
-          price: price,
-          tax: tax,
-          total: total
+    const scrollCarousel = (direction: 'left' | 'right') => {
+        if (carouselRef.current) {
+            carouselRef.current.scrollBy({
+                left: direction === 'left' ? -400 : 400,
+                behavior: 'smooth'
+            });
         }
-      }
-    });
-  };
+    };
 
-  if (loading) {
+    const services = [
+        {
+            id: 1,
+            title: 'Pádel Court 1',
+            subtitle: 'Pista Principal',
+            image: '/images/padel_1.jpg',
+            specs: ['Iluminación LED', 'Superficie Pro', 'Vestuarios'],
+            price: 'Desde 15€/hora'
+        },
+        {
+            id: 2,
+            title: 'Pádel Court 2',
+            subtitle: 'Pista Secundaria',
+            image: '/images/padel_2.jpg',
+            specs: ['Iluminación LED', 'Césped Premium', 'Parking'],
+            price: 'Desde 15€/hora'
+        },
+        {
+            id: 3,
+            title: 'Piscina Climatizada',
+            subtitle: 'Wellness Center',
+            image: '/images/piscina_3.jpg',
+            specs: ['28°C constante', 'Sistema salino', 'Solárium'],
+            price: 'Acceso incluido'
+        },
+        {
+            id: 4,
+            title: 'Gimnasio Premium',
+            subtitle: 'Fitness Studio',
+            image: '/images/gym_1.jpg',
+            specs: ['24/7 Access', 'Equipamiento Pro', 'A/C'],
+            price: 'Acceso incluido'
+        },
+        {
+            id: 5,
+            title: 'Sala Común',
+            subtitle: 'Event Space',
+            image: '/images/comunidad_4.jpg',
+            specs: ['Capacidad 50p', 'A/V System', 'Catering'],
+            price: 'Bajo reserva'
+        },
+        {
+            id: 6,
+            title: 'Zona Infantil',
+            subtitle: 'Kids Area',
+            image: '/images/zona_infantil.jpg',
+            specs: ['Supervisión', 'Juegos seguros', 'Aire libre'],
+            price: 'Acceso libre'
+        }
+    ];
+
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <Loader2 className="animate-spin text-purple-500" size={48} />
-      </div>
+        <div className="bg-black text-white overflow-x-hidden">
+            <nav
+                className={`fixed top-0 w-full z-50 transition-all duration-500 ${showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+                <div className="glass px-6 py-4 mx-4 mt-4 rounded-full">
+                    <div className="max-w-7xl mx-auto flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                                <span className="text-black font-bold text-sm">R</span>
+                            </div>
+                            <span className="font-semibold">RESIDENCIAL</span>
+                        </div>
+                        <div className="hidden md:flex gap-8 text-sm font-medium">
+                            <button onClick={() => scrollToSection('services')}
+                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Servicios
+                            </button>
+                            <button onClick={() => scrollToSection('facilities')}
+                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Instalaciones
+                            </button>
+                            <button onClick={() => scrollToSection('features')}
+                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Beneficios
+                            </button>
+                        </div>
+                        <button
+                            onClick={handleReserveAction}
+                            className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-200 transition cursor-pointer border-none">
+                            <Lock size={16}/>Acceder
+                        </button>
+                    </div>
+                </div>
+            </nav>
+
+            <section className="relative h-[200vh]">
+                <div className="sticky top-0 h-screen flex items-center justify-center overflow-hidden">
+                    <div className="absolute inset-0"
+                         style={{transform: `scale(${1 + scrollY * 0.0003})`, transition: 'transform 0.1s linear'}}>
+                        <img src="/images/comunidad_1.jpg" alt="Luxury" className="w-full h-full object-cover"
+                             loading="eager"/>
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/80"/>
+                    </div>
+                    <div className="relative z-10 text-center px-6 max-w-5xl" style={{
+                        opacity: Math.max(0, 1 - scrollY * 0.003),
+                        transform: `translateY(${scrollY * 0.5}px)`
+                    }}>
+                        <p className="text-gray-400 text-sm tracking-[0.3em] uppercase mb-6 font-medium">Sistema de
+                            Gestión Comunitaria</p>
+                        <h1 className="text-6xl md:text-8xl lg:text-[10rem] font-extralight mb-8 leading-[0.9] text-glow">Elegancia.<br/><span
+                            className="font-semibold">Simplicidad.</span></h1>
+                        <p className="text-xl md:text-2xl text-gray-300 font-light max-w-2xl mx-auto mb-12 leading-relaxed">Gestiona
+                            reservas de instalaciones deportivas<br className="hidden md:block"/> con la experiencia que
+                            mereces.</p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <button
+                                onClick={handleReserveAction}
+                                className="bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-200 transition shadow-2xl cursor-pointer border-none">
+                                Comenzar ahora
+                            </button>
+                            <button onClick={() => scrollToSection('services')}
+                                    className="glass px-8 py-4 rounded-full text-lg font-medium hover:bg-white/10 transition cursor-pointer text-white border border-white/10">Descubrir
+                                más
+                            </button>
+                        </div>
+                    </div>
+                    <button onClick={() => scrollToSection('services')}
+                            className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce bg-transparent border-none cursor-pointer"
+                            style={{opacity: Math.max(0, 1 - scrollY * 0.005)}}><ArrowDown className="text-white/50"
+                                                                                           size={32}/></button>
+                </div>
+            </section>
+
+            <section id="services" className="py-32 px-6 bg-black">
+                <div className="max-w-7xl mx-auto">
+                    <div className="text-center mb-16">
+                        <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Explora
+                            nuestras instalaciones</p>
+                        <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Todos los
+                            servicios.<br/><span className="font-semibold">A tu alcance.</span></h2>
+                    </div>
+                    <div className="flex justify-end gap-3 mb-6">
+                        <button onClick={() => scrollCarousel('left')}
+                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"><ChevronLeft size={24}/>
+                        </button>
+                        <button onClick={() => scrollCarousel('right')}
+                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"><ChevronRight
+                            size={24}/></button>
+                    </div>
+                    <div ref={carouselRef} className="carousel-container flex gap-6 pb-6 overflow-x-auto scrollbar-hide">
+                        {services.map((s) => (
+                            <div key={s.id}
+                                 className="service-card glass rounded-2xl overflow-hidden min-w-[350px] md:min-w-[400px] flex-shrink-0 border border-white/10">
+                                <div className="relative h-64 overflow-hidden">
+                                    <img src={s.image} alt={s.title} className="w-full h-full object-cover"
+                                         loading="lazy"/>
+                                    <div
+                                        className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"/>
+                                    <div className="absolute bottom-4 left-4 right-4">
+                                        <p className="text-xs tracking-widest text-gray-400 mb-1 uppercase">{s.subtitle}</p>
+                                        <h3 className="text-2xl font-semibold">{s.title}</h3>
+                                    </div>
+                                </div>
+                                <div className="p-6">
+                                    <div className="space-y-2 mb-4">{s.specs.map((sp, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-sm text-gray-400">
+                                            <div className="w-1 h-1 bg-white/50 rounded-full"></div>
+                                            {sp}</div>))}</div>
+                                    <div className="flex justify-between items-center pt-4 border-t border-white/10">
+                                        <span className="text-sm font-medium text-gray-400">{s.price}</span>
+                                        <button
+                                            onClick={handleReserveAction}
+                                            className="text-sm font-medium hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">
+                                            Reservar →
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="text-center mt-8"><p className="text-sm text-gray-500">← Desliza para ver más →</p>
+                    </div>
+                </div>
+            </section>
+
+            {/* SECCIONES INTERMEDIAS (Visuales) */}
+            <section id="facilities" className="relative h-[200vh]">
+                <div className="sticky top-0 h-screen flex items-center justify-center px-6">
+                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+                        <div style={{
+                            opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 300)),
+                            transform: `translateX(${Math.max(-50, -50 + (scrollY - 1500) / 10)}px)`
+                        }}>
+                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Deporte
+                                Premium</p>
+                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Pistas de<br/><span
+                                className="font-semibold">Pádel</span></h2>
+                            <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">Tres pistas
+                                profesionales con iluminación LED de última generación. Superficie de juego premium y
+                                sistema de reserva inteligente.</p>
+                        </div>
+                        <div className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl" style={{
+                            transform: `scale(${0.8 + Math.min(0.2, (scrollY - 1500) / 1500)})`,
+                            opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 400))
+                        }}>
+                            <img src="/images/padel_3.jpg" alt="Padel" className="w-full h-full object-cover"
+                                 loading="lazy"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="relative h-[200vh] bg-gradient-to-b from-black to-gray-950">
+                <div className="sticky top-0 h-screen flex items-center justify-center px-6">
+                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+                        <div
+                            className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl order-2 md:order-1"
+                            style={{
+                                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
+                                opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
+                            }}>
+                            <img src="/images/piscina_2.jpg" alt="Pool" className="w-full h-full object-cover"
+                                 loading="lazy"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                        </div>
+                        <div className="order-1 md:order-2" style={{
+                            opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 300)),
+                            transform: `translateX(${Math.min(50, 50 - (scrollY - 2500) / 10)}px)`
+                        }}>
+                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Wellness &
+                                Relax</p>
+                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Piscina<br/><span
+                                className="font-semibold">Climatizada</span></h2>
+                            <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">Disfruta todo el año de
+                                nuestra piscina climatizada con tecnología de purificación salina y control de aforo
+                                inteligente.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="relative h-[200vh] bg-gradient-to-b from-gray-950 to-black">
+                <div className="sticky top-0 h-screen flex items-center justify-center px-6">
+                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+                        <div style={{
+                            opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 300)),
+                            transform: `translateX(${Math.max(-50, -50 + (scrollY - 3500) / 10)}px)`
+                        }}>
+                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Fitness &
+                                Training</p>
+                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Gimnasio<br/><span
+                                className="font-semibold">Completo</span></h2>
+                            <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">Equipamiento de última
+                                generación en un espacio diseñado para tu bienestar.</p>
+                        </div>
+                        <div className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl" style={{
+                            transform: `scale(${0.8 + Math.min(0.2, (scrollY - 3500) / 1500)})`,
+                            opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 400))
+                        }}>
+                            <img src="/images/gym_3.jpg" alt="Gym" className="w-full h-full object-cover"
+                                 loading="lazy"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="features" className="py-32 px-6 bg-black">
+                <div className="max-w-7xl mx-auto">
+                    <h2 className="text-5xl md:text-7xl font-light text-center mb-20 leading-tight">Diseñado
+                        para<br/><span className="font-semibold">tu comodidad.</span></h2>
+                    <div className="grid md:grid-cols-3 gap-8">
+                        {[
+                            {
+                                icon: <Calendar size={32}/>,
+                                title: 'Reserva instantánea',
+                                desc: 'Sistema intuitivo que permite reservar cualquier instalación en menos de 30 segundos desde tu móvil.'
+                            },
+                            {
+                                icon: <Shield size={32}/>,
+                                title: 'Totalmente seguro',
+                                desc: 'Autenticación robusta y protección de datos con encriptación de extremo a extremo.'
+                            },
+                            {
+                                icon: <Clock size={32}/>,
+                                title: 'Siempre disponible',
+                                desc: 'Accede y gestiona tus reservas 24/7 desde cualquier dispositivo, en cualquier lugar.'
+                            }
+                        ].map((f, i) => (
+                            <div key={i}
+                                 className="glass p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 group border border-white/10">
+                                <div
+                                    className="text-white/70 mb-6 group-hover:scale-110 transition-transform">{f.icon}</div>
+                                <h3 className="text-2xl font-semibold mb-4">{f.title}</h3>
+                                <p className="text-gray-400 leading-relaxed font-light">{f.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="py-32 px-6 bg-gradient-to-b from-black to-gray-950">
+                <div className="max-w-7xl mx-auto">
+                    <div className="glass p-16 rounded-3xl border border-white/10">
+                        <div className="grid md:grid-cols-3 gap-12 text-center">
+                            <div>
+                                <div className="text-6xl md:text-7xl font-extralight mb-4">500+</div>
+                                <p className="text-gray-400 text-lg font-light">Reservas mensuales</p></div>
+                            <div>
+                                <div className="text-6xl md:text-7xl font-extralight mb-4">98%</div>
+                                <p className="text-gray-400 text-lg font-light">Tasa de satisfacción</p></div>
+                            <div>
+                                <div className="text-6xl md:text-7xl font-extralight mb-4">24/7</div>
+                                <p className="text-gray-400 text-lg font-light">Disponibilidad total</p></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="cta" className="py-32 px-6 text-center bg-gradient-to-b from-gray-950 to-black">
+                <div className="max-w-4xl mx-auto">
+                    <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight">Tu experiencia<br/><span
+                        className="font-semibold">comienza aquí.</span></h2>
+                    <p className="text-xl text-gray-400 mb-12 leading-relaxed font-light max-w-2xl mx-auto">Únete a una
+                        comunidad que valora su tiempo y disfruta de instalaciones de primera clase.</p>
+                    <button
+                        onClick={handleReserveAction}
+                        className="bg-white text-black px-12 py-5 rounded-full text-xl font-medium hover:bg-gray-200 transition shadow-2xl inline-flex items-center gap-3 cursor-pointer border-none">
+                        <Lock size={24}/>Acceder al sistema
+                    </button>
+                </div>
+            </section>
+
+            <footer className="border-t border-white/10 py-12 px-6 bg-black">
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4"><p
+                    className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
+                    reservados.</p>
+                    <div className="flex gap-6 text-sm text-gray-500 font-light">
+                        <button onClick={() => window.location.href = '/privacy'}
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Privacidad
+                        </button>
+                        <button onClick={() => window.location.href = '/terms'}
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Términos
+                        </button>
+                        <button onClick={() => window.location.href = '/support'}
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Soporte
+                        </button>
+                    </div>
+                </div>
+            </footer>
+        </div>
     );
-  }
-
-  return (
-    <div className="min-h-screen bg-black text-white">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-      `}</style>
-
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-64 glass border-r border-white/10 p-6 z-50">
-        <div className="flex items-center gap-3 mb-12 cursor-pointer" onClick={() => setActiveTab('home')}>
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-            <span className="text-black font-bold">R</span>
-          </div>
-          <span className="font-semibold text-lg">RESIDENCIAL</span>
-        </div>
-
-        <nav className="space-y-2">
-          {[
-            { id: 'home', icon: <Home size={20} />, label: 'Inicio' },
-            { id: 'reservations', icon: <Calendar size={20} />, label: 'Mis Reservas' },
-            { id: 'book', icon: <Plus size={20} />, label: 'Nueva Reserva' },
-            { id: 'profile', icon: <User size={20} />, label: 'Perfil' },
-            { id: 'settings', icon: <Settings size={20} />, label: 'Configuración' }
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                activeTab === item.id
-                  ? 'bg-white text-black'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {item.icon}
-              <span className="font-medium">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <button
-          onClick={handleLogout}
-          className="absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition cursor-pointer"
-        >
-          <LogOut size={20} />
-          <span>Cerrar sesión</span>
-        </button>
-      </aside>
-
-      {/* Main Content */}
-      <main className="ml-64 p-8">
-        {/* Header */}
-        <header className="flex justify-between items-center mb-12">
-          <div>
-            <h1 className="text-4xl font-light mb-2">
-              {activeTab === 'home' && 'Bienvenido de nuevo'}
-              {activeTab === 'reservations' && 'Mis Reservas'}
-              {activeTab === 'book' && 'Nueva Reserva'}
-              {activeTab === 'profile' && 'Mi Perfil'}
-            </h1>
-            <p className="text-gray-400">
-              {new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="glass px-4 py-2 rounded-full flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-bold">
-                 {user?.full_name?.charAt(0) || 'U'}
-              </div>
-              <span className="text-sm font-medium">{user?.full_name || 'Usuario'}</span>
-            </div>
-          </div>
-        </header>
-
-        {/* HOME TAB */}
-        {activeTab === 'home' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="glass p-6 rounded-2xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
-                    <Calendar className="text-blue-400" size={24} />
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Reservas totales</p>
-                    <p className="text-3xl font-light">{reservations.length}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass p-8 rounded-2xl">
-              <h2 className="text-2xl font-light mb-6">Mis reservas recientes</h2>
-              <div className="space-y-4">
-                {reservations.length === 0 ? (
-                    <p className="text-gray-400">No tienes reservas activas.</p>
-                ) : (
-                    reservations.slice(0, 3).map((res) => (
-                    <div key={res.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition">
-                        <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                            <Calendar size={20} />
-                        </div>
-                        <div>
-                            <p className="font-medium">{res.facility_id}</p>
-                            <p className="text-sm text-gray-400">
-                                {new Date(res.start_time).toLocaleDateString()} • {new Date(res.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </p>
-                        </div>
-                        </div>
-                        <span className="px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-400">
-                           Confirmada
-                        </span>
-                    </div>
-                    ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* RESERVATIONS TAB */}
-        {activeTab === 'reservations' && (
-          <div className="space-y-6">
-            {reservations.map((res) => (
-              <div key={res.id} className="glass p-6 rounded-2xl hover:bg-white/10 transition">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                      <Calendar size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-medium mb-1">{res.facility_id}</h3>
-                      <p className="text-gray-400 text-sm">
-                        {new Date(res.start_time).toLocaleDateString()}
-                      </p>
-                      <p className="text-gray-400 text-sm">
-                        {new Date(res.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(res.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* BOOK TAB */}
-        {activeTab === 'book' && (
-          <div className="space-y-8">
-            <div className="glass p-8 rounded-2xl text-center">
-              <h2 className="text-2xl font-light mb-6">Realizar nueva reserva</h2>
-              <button
-                onClick={() => setShowReserveModal(true)}
-                className="px-8 py-4 bg-white text-black rounded-full font-medium hover:bg-gray-200 transition text-lg cursor-pointer"
-              >
-                Abrir formulario de reserva
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* PROFILE TAB */}
-        {activeTab === 'profile' && user && (
-          <div className="max-w-4xl">
-            <div className="glass p-8 rounded-2xl mb-8">
-              <div className="flex items-center gap-6 mb-8">
-                <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-3xl font-bold">
-                    {user.full_name?.charAt(0)}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-light mb-2">{user.full_name}</h2>
-                  <p className="text-gray-400">Apartamento: {user.apartment}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Email</label>
-                  <input type="email" value={user.email} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2" readOnly />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Teléfono</label>
-                  <input type="text" value={user.phone || 'No registrado'} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2" readOnly />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Reserve Modal */}
-      {showReserveModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-          <div className="glass p-8 rounded-2xl max-w-2xl w-full">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-light">Nueva Reserva</h2>
-              <button onClick={() => setShowReserveModal(false)} className="p-2 hover:bg-white/10 rounded-lg transition cursor-pointer bg-transparent border-none">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Instalación</label>
-                <select
-                    value={newResFacility}
-                    onChange={(e) => setNewResFacility(e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-white/30 transition text-white"
-                >
-                  <option value="Padel 1">Pista de Pádel 1</option>
-                  <option value="Padel 2">Pista de Pádel 2</option>
-                  <option value="Piscina">Piscina</option>
-                  <option value="Gimnasio">Gimnasio</option>
-                  <option value="Sala Común">Sala Común</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Fecha</label>
-                  <input
-                    type="date"
-                    value={newResDate}
-                    onChange={(e) => setNewResDate(e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-white/30 transition text-white scheme-dark"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Hora Inicio</label>
-                  <input
-                    type="time"
-                    value={newResTime}
-                    onChange={(e) => setNewResTime(e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 focus:outline-none focus:border-white/30 transition text-white scheme-dark"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 mt-6">
-                <button
-                    onClick={() => setShowReserveModal(false)}
-                    className="flex-1 py-3 glass rounded-lg hover:bg-white/10 transition cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                    onClick={handleCreateReservation}
-                    className="flex-1 py-3 bg-white text-black rounded-lg font-medium hover:bg-gray-200 transition cursor-pointer border-none"
-                >
-                  Ir al Pago (15.00€)
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
