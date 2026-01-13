@@ -1,22 +1,57 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* Importación de la fuente Inter usada en el Landing */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Configuración base */
+@layer base {
+  body {
+    background-color: #000000;
+    color: white;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* Aplica la fuente */
+  * {
+    font-family: 'Inter', sans-serif;
+    scroll-behavior: smooth;
+  }
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  background-color: #000000;
-}
+/* Componentes personalizados de LandingPage.tsx */
+@layer components {
+  /* Efecto cristal (Glassmorphism) */
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
-  background-color: #000000;
+  /* Efecto de brillo en el texto principal */
+  .text-glow {
+    text-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+  }
+
+  /* Ocultar barra de scroll en el carrusel de servicios */
+  .carousel-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .carousel-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Animación hover para las tarjetas de servicios */
+  .service-card {
+    transition: transform 0.3s ease;
+  }
+
+  .service-card:hover {
+    transform: scale(1.02);
+  }
 }

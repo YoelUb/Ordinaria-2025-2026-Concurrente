@@ -6,6 +6,7 @@ export default function LandingPage() {
     const [showNav, setShowNav] = useState(false);
     const carouselRef = useRef<HTMLDivElement>(null);
 
+    // Mantiene la lógica de detección de scroll para animaciones
     useEffect(() => {
         let ticking = false;
         const handleScroll = () => {
@@ -22,10 +23,12 @@ export default function LandingPage() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    // Función para navegación suave a secciones
     const scrollToSection = (id: string) => {
         document.getElementById(id)?.scrollIntoView({behavior: 'smooth'});
     };
 
+    // Lógica del carrusel de servicios
     const scrollCarousel = (direction: 'left' | 'right') => {
         if (carouselRef.current) {
             carouselRef.current.scrollBy({
@@ -40,7 +43,7 @@ export default function LandingPage() {
             id: 1,
             title: 'Pádel Court 1',
             subtitle: 'Pista Principal',
-            image: '/images/comunidad_1.jpg',
+            image: '/images/padel_1.jpg',
             specs: ['Iluminación LED', 'Superficie Pro', 'Vestuarios'],
             price: 'Desde 15€/hora'
         },
@@ -48,7 +51,7 @@ export default function LandingPage() {
             id: 2,
             title: 'Pádel Court 2',
             subtitle: 'Pista Secundaria',
-            image: '/images/comunidad_2.jpg',
+            image: '/images/padel_2.jpg',
             specs: ['Iluminación LED', 'Césped Premium', 'Parking'],
             price: 'Desde 15€/hora'
         },
@@ -56,7 +59,7 @@ export default function LandingPage() {
             id: 3,
             title: 'Piscina Climatizada',
             subtitle: 'Wellness Center',
-            image: '/images/comunidad_3.jpg',
+            image: '/images/piscina_3.jpg',
             specs: ['28°C constante', 'Sistema salino', 'Solárium'],
             price: 'Acceso incluido'
         },
@@ -64,7 +67,7 @@ export default function LandingPage() {
             id: 4,
             title: 'Gimnasio Premium',
             subtitle: 'Fitness Studio',
-            image: '/images/comunidad_4.jpg',
+            image: '/images/gym_1.jpg',
             specs: ['24/7 Access', 'Equipamiento Pro', 'A/C'],
             price: 'Acceso incluido'
         },
@@ -72,7 +75,7 @@ export default function LandingPage() {
             id: 5,
             title: 'Sala Común',
             subtitle: 'Event Space',
-            image: '/images/comunidad_1.jpg',
+            image: '/images/comunidad_4.jpg',
             specs: ['Capacidad 50p', 'A/V System', 'Catering'],
             price: 'Bajo reserva'
         },
@@ -80,7 +83,7 @@ export default function LandingPage() {
             id: 6,
             title: 'Zona Infantil',
             subtitle: 'Kids Area',
-            image: '/images/comunidad_2.jpg',
+            image: '/images/zona_infantil.jpg',
             specs: ['Supervisión', 'Juegos seguros', 'Aire libre'],
             price: 'Acceso libre'
         }
@@ -88,16 +91,8 @@ export default function LandingPage() {
 
     return (
         <div className="bg-black text-white overflow-x-hidden">
-            <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        * { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .text-glow { text-shadow: 0 0 40px rgba(255, 255, 255, 0.3); }
-        .carousel-container { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; }
-        .carousel-container::-webkit-scrollbar { display: none; }
-        .service-card { transition: transform 0.3s ease; }
-        .service-card:hover { transform: scale(1.02); }
-      `}</style>
+            {/* Nota: La etiqueta <style> se ha eliminado.
+                Los estilos .glass, .text-glow, fuentes y scrollbar ahora se cargan desde index.css */}
 
             <nav
                 className={`fixed top-0 w-full z-50 transition-all duration-500 ${showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
@@ -248,7 +243,7 @@ export default function LandingPage() {
                             transform: `scale(${0.8 + Math.min(0.2, (scrollY - 1500) / 1500)})`,
                             opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 400))
                         }}>
-                            <img src="/images/comunidad_2.jpg" alt="Padel" className="w-full h-full object-cover"
+                            <img src="/images/padel_3.jpg" alt="Padel" className="w-full h-full object-cover"
                                  loading="lazy"/>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                         </div>
@@ -265,7 +260,7 @@ export default function LandingPage() {
                                 transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
                                 opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
                             }}>
-                            <img src="/images/comunidad_3.jpg" alt="Pool" className="w-full h-full object-cover"
+                            <img src="/images/piscina_2.jpg" alt="Pool" className="w-full h-full object-cover"
                                  loading="lazy"/>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                         </div>
@@ -332,7 +327,7 @@ export default function LandingPage() {
                             transform: `scale(${0.8 + Math.min(0.2, (scrollY - 3500) / 1500)})`,
                             opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 400))
                         }}>
-                            <img src="/images/comunidad_4.jpg" alt="Gym" className="w-full h-full object-cover"
+                            <img src="/images/gym_3.jpg" alt="Gym" className="w-full h-full object-cover"
                                  loading="lazy"/>
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                         </div>
@@ -407,13 +402,19 @@ export default function LandingPage() {
             </section>
 
             <footer className="border-t border-white/10 py-12 px-6 bg-black">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                    <p className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
-                        reservados.</p>
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4"><p
+                    className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
+                    reservados.</p>
                     <div className="flex gap-6 text-sm text-gray-500 font-light">
-                        <button className="hover:text-white transition">Privacidad</button>
-                        <button className="hover:text-white transition">Términos</button>
-                        <button className="hover:text-white transition">Soporte</button>
+                        <button onClick={() => window.location.href = '/privacy'}
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer">Privacidad
+                        </button>
+                        <button onClick={() => window.location.href = '/terms'}
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer">Términos
+                        </button>
+                        <button onClick={() => window.location.href = '/support'}
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer">Soporte
+                        </button>
                     </div>
                 </div>
             </footer>
