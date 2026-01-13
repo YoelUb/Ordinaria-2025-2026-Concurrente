@@ -15,11 +15,19 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
+    # El backend no arrancará hasta que este test pase.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # --- Servicio de backend con FastAPI ---
   web:
     build: .
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    # Ejecuta migraciones (alembic)
+    # Si sale bien, arranca el servidor
+    command: sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
       - ./firebase_credentials.json:/app/firebase_credentials.json
@@ -28,7 +36,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   # --- Servicio frontend (React + Vite) ---
   frontend:

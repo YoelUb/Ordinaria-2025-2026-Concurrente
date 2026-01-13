@@ -24,3 +24,10 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+
+# Propiedades de informacion del usuario
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    apartment: Optional[str] = None
