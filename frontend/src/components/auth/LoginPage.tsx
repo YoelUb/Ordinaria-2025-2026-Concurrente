@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider, githubProvider } from "../../config/Firebase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -7,19 +9,96 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Login social
+  const authenticateWithBackendSocial = async (firebaseToken: string) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/auth/login/social', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: firebaseToken }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Error en el backend');
+      }
+
+      const data = await response.json();
+      console.log("Login Social exitoso:", data);
+      localStorage.setItem('token', data.access_token);
+      return true;
+    } catch (error) {
+      console.error("Error backend social:", error);
+      alert("Error al conectar con el servidor.");
+      return false;
+    }
+  };
+
+  const handleSocialLogin = async (provider: any) => {
+    setIsLoading(true);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const token = await result.user.getIdToken();
+
+      const success = await authenticateWithBackendSocial(token);
+
+      if (success) {
+        window.location.href = '/';
+      }
+    } catch (error: any) {
+      console.error(error);
+      alert('Error: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- Login normal ---
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      alert('Login successful!');
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Credenciales incorrectas');
+      }
+
+      const data = await response.json();
+      console.log("Login tradicional exitoso:", data);
+
+      // Guardamos el token real
+      localStorage.setItem('token', data.access_token);
+
+      // Redirigimos
+      alert('¡Bienvenido de vuelta!');
       window.location.href = '/';
-    }, 1500);
+
+    } catch (error: any) {
+      console.error("Error login:", error);
+      alert("Error: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* Background Image with Overlay */}
+      {/* Fondo */}
       <div className="fixed inset-0 z-0">
         <img
            src="/images/comunidad_1.jpg"
@@ -29,7 +108,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       </div>
 
-      {/* Top Navigation */}
+      {/* Menu */}
       <nav className="relative z-10 px-6 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <button
@@ -50,7 +129,7 @@ export default function LoginPage() {
         </div>
       </nav>
 
-      {/* Login Form */}
+      {/* Formulario registro */}
       <div className="relative z-10 flex items-center justify-center px-6 py-20">
         <div className="w-full max-w-md">
           {/* Header */}
@@ -67,9 +146,9 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Form */}
+          {/* Formulario */}
           <form onSubmit={handleSubmit} className="glass p-8 rounded-3xl space-y-6">
-            {/* Email Field */}
+            {/* Campo email */}
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">
                 Correo electrónico
@@ -90,7 +169,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Password Field */}
+            {/* Campo contraseña */}
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">
                 Contraseña
@@ -118,7 +197,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember & Forgot */}
+            {/* Si se olvio la password */}
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
@@ -137,7 +216,7 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Submit Button */}
+            {/* Boton de envio */}
             <button
               type="submit"
               disabled={isLoading}
@@ -165,10 +244,11 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Social Login */}
+            {/* Botones sociales */}
             <div className="grid grid-cols-2 gap-4">
               <button
                 type="button"
+                onClick={() => handleSocialLogin(googleProvider)}
                 className="py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -181,6 +261,7 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
+                onClick={() => handleSocialLogin(githubProvider)}
                 className="py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -190,12 +271,12 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Footer Links */}
+            {/* Footer links */}
             <div className="text-center mt-8">
               <p className="text-sm text-gray-500">
                 ¿Necesitas ayuda?{' '}
-             <button type="button" onClick={() => window.location.href = '/support'} className="text-white hover:text-gray-300 transition font-medium bg-transparent border-none cursor-pointer underline decoration-transparent hover:decoration-white">
-                  Contacta con la administración
+                <button type="button" onClick={() => window.location.href = '/support'} className="text-white hover:text-gray-300 transition font-medium bg-transparent border-none cursor-pointer">
+                  Contacta con soporte
                 </button>
               </p>
             </div>

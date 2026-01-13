@@ -1,5 +1,5 @@
 import firebase_admin
-from firebase_admin import credentials
+from firebase_admin import credentials, auth
 from src.core.config import settings
 import logging
 
@@ -14,3 +14,15 @@ def initialize_firebase():
             logger.info("Firebase Admin inicializado correctamente.")
     except Exception as e:
         logger.error(f"Error al iniciar Firebase: {e}")
+
+def verify_id_token(token: str):
+    """
+    Verifica el token ID de Firebase enviado por el cliente.
+    Retorna el diccionario con los datos del usuario o None si falla.
+    """
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        logger.error(f"Error verificando token de Firebase: {e}")
+        return None
