@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, User, Settings, LogOut, Home, Bell, Search, Plus, X, Loader2, Save, MapPin, AlertCircle } from 'lucide-react';
+import {
+  Calendar, User, Settings, LogOut, Home, Bell, Search, Plus,
+  X, Loader2, Save, MapPin, AlertCircle, Camera, Trash2
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// --- Expresiones regulares como en el registro ---
+// --- Expresiones Regulares (Validación Estricta) ---
 const APARTMENT_REGEX = /^\d+\s*[A-Z]+$/;
 const POSTAL_CODE_REGEX = /^\d{5}$/;
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
@@ -24,6 +27,14 @@ interface UserProfile {
   phone: string;
   postal_code?: string;
   address?: string;
+  avatar_url?: string; // URL de la imagen en MinIO
+}
+
+interface Notification {
+  id: number;
+  text: string;
+  read: boolean;
+  time: string;
 }
 
 type PhotonFeature = {
@@ -45,35 +56,43 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
 
-  // Referencia para evitar toast duplicado
+  // Referencias
   const toastShownRef = useRef(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Modales
+  // Estados de Interfaz
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showCompleteProfile, setShowCompleteProfile] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Estados de datos
+  // Estados de Datos
   const [user, setUser] = useState<UserProfile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([
+      { id: 1, text: "Bienvenido al sistema residencial", read: true, time: "Sistema" }
+  ]);
+
+  // Estados de Carga
   const [loading, setLoading] = useState(true);
   const [updatingProfile, setUpdatingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // Formulario Reserva
+  // Reserva
   const [newResFacility, setNewResFacility] = useState('Pádel Court 1');
   const [newResDate, setNewResDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
   const [busySlots, setBusySlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Formulario Completar Perfil
+  // Perfil & Direcciones
   const [profileForm, setProfileForm] = useState({ phone: '', address: '', apartment: '', postal_code: '' });
-
-  // Autocompletado Photon
   const [addressSuggestions, setAddressSuggestions] = useState<PhotonFeature[]>([]);
   const [showAddressMenu, setShowAddressMenu] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // --- 1. Cargar Datos ---
+  // --- 1. Cargar Datos y Polling (1s) ---
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
@@ -82,7 +101,7 @@ export default function Dashboard() {
       try {
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-        // Perfil
+        // Cargar Perfil
         const userResponse = await fetch('http://localhost:8000/api/v1/users/me', { headers });
         if (userResponse.status === 401) { handleLogout(); return; }
 
@@ -90,47 +109,84 @@ export default function Dashboard() {
           const userData = await userResponse.json();
           setUser(userData);
 
-          // Verificar si faltan datos
-          if (!userData.phone || !userData.address || !userData.apartment) {
-             setProfileForm({
-                 phone: userData.phone || '',
-                 address: userData.address || '',
-                 apartment: userData.apartment || '',
-                 postal_code: userData.postal_code || ''
-             });
-
-             setShowCompleteProfile(true);
+          // Verificar si faltan datos (Solo 1 vez)
+          if ((!userData.phone || !userData.address || !userData.apartment) && !showCompleteProfile) {
+             setProfileForm(prev => ({
+                 phone: userData.phone || prev.phone,
+                 address: userData.address || prev.address,
+                 apartment: userData.apartment || prev.apartment,
+                 postal_code: userData.postal_code || prev.postal_code
+             }));
 
              if (!toastShownRef.current) {
+                 setShowCompleteProfile(true);
                  toast("Por favor completa tu perfil para continuar", { icon: '📝', duration: 5000 });
                  toastShownRef.current = true;
              }
           }
         }
 
-        // Reservas
+        // Cargar Reservas
         const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', { headers });
         if (resResponse.ok) {
           const resData = await resResponse.json();
-          setReservations(resData);
+          // Ordenar por fecha más reciente
+          const sortedRes = resData.sort((a: Reservation, b: Reservation) =>
+            new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+          );
+
+          if (JSON.stringify(sortedRes) !== JSON.stringify(reservations)) {
+              setReservations(sortedRes);
+          }
         }
 
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching data", error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
+
+    const intervalId = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+            fetchData();
+        }
+    }, 1000); // Polling cada 1 segundo
+
+    return () => clearInterval(intervalId);
   }, [navigate]);
 
-  // --- 2. Disponibilidad (Slots) ---
+  // --- 2. Detectar Notificaciones tras Pago (CORREGIDO) ---
+  useEffect(() => {
+      // Verificamos la bandera 'paymentSuccess' que debe poner el PaymentGateway al terminar
+      const paymentSuccess = localStorage.getItem('paymentSuccess');
+
+      if (paymentSuccess) {
+          // 1. Crear notificación
+          const newNotif = {
+              id: Date.now(),
+              text: "¡Reserva confirmada exitosamente!",
+              read: false,
+              time: "Ahora mismo"
+          };
+          setNotifications(prev => [newNotif, ...prev]);
+
+          // 2. Limpiar bandera para que no salga al recargar
+          localStorage.removeItem('paymentSuccess');
+
+          // 3. Mostrar feedback visual
+          setShowNotifications(true); // Abrir menú
+          setTimeout(() => setShowNotifications(false), 3000); // Cerrar a los 3s
+      }
+  }, []);
+
+  // --- 3. Disponibilidad (Slots) con Polling (1s) ---
   useEffect(() => {
       if (!showReserveModal) return;
 
       const fetchAvailability = async () => {
-          setLoadingSlots(true);
-          setSelectedTimeSlot(null);
           try {
               const token = localStorage.getItem('token');
               const response = await fetch(
@@ -141,19 +197,30 @@ export default function Dashboard() {
               if (response.ok) {
                   const data = await response.json();
                   const occupiedStartTimes = data.map((slot: any) => slot.start);
-                  setBusySlots(occupiedStartTimes);
+
+                  setBusySlots(prev => {
+                      if (JSON.stringify(prev) !== JSON.stringify(occupiedStartTimes)) {
+                          return occupiedStartTimes;
+                      }
+                      return prev;
+                  });
               }
           } catch (error) {
               console.error(error);
           } finally {
-              setLoadingSlots(false);
+              if (loadingSlots) setLoadingSlots(false);
           }
       };
 
+      setLoadingSlots(true);
       fetchAvailability();
+
+      const interval = setInterval(fetchAvailability, 1000);
+      return () => clearInterval(interval);
+
   }, [newResFacility, newResDate, showReserveModal]);
 
-  // --- 3. Autocompletado Photon ---
+  // --- 4. Autocompletado Photon ---
   useEffect(() => {
     if (profileForm.address.length < 3 || !showAddressMenu) { setAddressSuggestions([]); return; }
     const timeoutId = setTimeout(async () => {
@@ -168,10 +235,14 @@ export default function Dashboard() {
     return () => clearTimeout(timeoutId);
   }, [profileForm.address, showAddressMenu]);
 
+  // Cerrar menús al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
         if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
             setAddressSuggestions([]);
+        }
+        if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+            setShowNotifications(false);
         }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -191,57 +262,99 @@ export default function Dashboard() {
     setShowAddressMenu(false);
   };
 
+  // --- 5. Lógica de Avatar (MinIO) ---
+  const handleAvatarClick = () => {
+      fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+          toast.error("Por favor sube una imagen válida");
+          return;
+      }
+
+      setUploadingAvatar(true);
+      const loadingToast = toast.loading("Subiendo foto...");
+
+      try {
+          const token = localStorage.getItem('token');
+          const formData = new FormData();
+          formData.append('file', file);
+
+          // Endpoint backend (Debes tenerlo implementado en src/routers/users.py)
+          const response = await fetch('http://localhost:8000/api/v1/users/me/avatar', {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${token}`
+              },
+              body: formData
+          });
+
+          if (response.ok) {
+              const data = await response.json();
+              // Actualizamos la URL del usuario con la que devuelve MinIO
+              setUser(prev => prev ? { ...prev, avatar_url: data.avatar_url } : null);
+              toast.success("Foto actualizada", { id: loadingToast });
+          } else {
+              // Si falla el backend real, lanzamos error
+              throw new Error("Fallo en la subida");
+          }
+      } catch (error) {
+          console.error(error);
+          toast.error("Error al subir imagen. ¿MinIO está activo?", { id: loadingToast });
+      } finally {
+          setUploadingAvatar(false);
+      }
+  };
+
+  // --- 6. Buscador (Filtrado Global) ---
+  const filteredReservations = reservations.filter(res => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      const date = new Date(res.start_time).toLocaleDateString();
+      return res.facility.toLowerCase().includes(query) || date.includes(query);
+  });
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     navigate('/login');
   };
 
-  // --- 4. GUARDAR PERFIL CON VALIDACIÓN REGEX ---
   const handleUpdateProfile = async (e: React.FormEvent) => {
       e.preventDefault();
 
-      // 1. Validar campos vacíos
       if(!profileForm.phone.trim() || !profileForm.apartment.trim() || !profileForm.address.trim()) {
-          toast.error("Todos los campos son obligatorios.");
-          return;
+          toast.error("Todos los campos son obligatorios."); return;
       }
-
-      // 2. Validar Teléfono
+      if (profileForm.address.trim().length < 5 || /^\d+$/.test(profileForm.address)) {
+          toast.error("Dirección inválida."); return;
+      }
       const cleanPhone = profileForm.phone.replace(/[\s-]/g, '');
       if (!PHONE_REGEX.test(cleanPhone)) {
-          toast.error("Teléfono inválido (mínimo 9 dígitos).");
-          return;
+          toast.error("Teléfono inválido."); return;
       }
-
-      // 3. Validar Apartamento (Numero + Letra Mayúscula)
-      // Aseguramos mayúscula antes de testear
-      const upperApartment = profileForm.apartment.toUpperCase();
-      if (!APARTMENT_REGEX.test(upperApartment)) {
-          toast.error("El apartamento debe ser Nº y Letra (Ej: 4B).");
-          return;
+      if (!APARTMENT_REGEX.test(profileForm.apartment.toUpperCase())) {
+          toast.error("Apartamento incorrecto (Ej: 4B)."); return;
       }
-
-      // 4. Validar Código Postal (5 dígitos)
       if (!POSTAL_CODE_REGEX.test(profileForm.postal_code)) {
-          toast.error("El código postal debe tener 5 dígitos.");
-          return;
+          toast.error("Código Postal debe tener 5 dígitos."); return;
       }
 
       setUpdatingProfile(true);
-      const loadingToast = toast.loading("Validando datos...");
+      const loadingToast = toast.loading("Guardando...");
 
       try {
           const token = localStorage.getItem('token');
           const response = await fetch('http://localhost:8000/api/v1/users/me', {
               method: 'PUT',
-              headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-              },
+              headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   phone: cleanPhone,
                   address: profileForm.address,
-                  apartment: upperApartment, // Enviamos ya en mayúsculas
+                  apartment: profileForm.apartment.toUpperCase(),
                   postal_code: profileForm.postal_code
               })
           });
@@ -250,31 +363,26 @@ export default function Dashboard() {
               const updatedUser = await response.json();
               setUser(updatedUser);
               setShowCompleteProfile(false);
-              toast.success("¡Perfil completado correctamente!", { id: loadingToast });
+              toast.success("¡Perfil completado!", { id: loadingToast });
           } else {
-              throw new Error("No se pudo actualizar");
+              throw new Error("Error al actualizar");
           }
       } catch(err) {
-          toast.error("Error al conectar con el servidor", { id: loadingToast });
+          toast.error("Error de conexión", { id: loadingToast });
       } finally {
           setUpdatingProfile(false);
       }
   };
 
-  // --- 5. Crear Reserva ---
   const handleCreateReservation = () => {
-    if (!selectedTimeSlot) { toast.error("Selecciona un horario disponible"); return; }
-
+    if (!selectedTimeSlot) { toast.error("Selecciona un horario"); return; }
     if (!user?.apartment || !user?.phone) {
-        toast.error("Datos incompletos. Revisa tu perfil.");
-        setShowCompleteProfile(true);
-        return;
+        toast.error("Perfil incompleto"); setShowCompleteProfile(true); return;
     }
 
     const startDateTime = new Date(`${newResDate}T${selectedTimeSlot}:00`);
-    const durationMinutes = 90;
-    const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60000);
-    const endTimeString = `${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`;
+    const endDateTime = new Date(startDateTime.getTime() + 90 * 60000);
+    const endTimeString = endDateTime.toTimeString().slice(0, 5);
     const displayDate = startDateTime.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const price = 15.00;
@@ -284,18 +392,8 @@ export default function Dashboard() {
     setShowReserveModal(false);
     navigate('/payment', {
       state: {
-        reservationData: {
-          facility: newResFacility,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-        },
-        displayData: {
-          facility: newResFacility,
-          date: displayDate,
-          time: `${selectedTimeSlot} - ${endTimeString}`,
-          duration: '1h 30m',
-          price, tax, total
-        }
+        reservationData: { facility: newResFacility, start_time: startDateTime.toISOString(), end_time: endDateTime.toISOString() },
+        displayData: { facility: newResFacility, date: displayDate, time: `${selectedTimeSlot} - ${endTimeString}`, duration: '1h 30m', price, tax, total }
       }
     });
   };
@@ -332,9 +430,7 @@ export default function Dashboard() {
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-none cursor-pointer ${
-                activeTab === item.id
-                  ? 'bg-white text-black'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5 bg-transparent'
+                activeTab === item.id ? 'bg-white text-black' : 'text-gray-400 hover:text-white hover:bg-white/5 bg-transparent'
               }`}
             >
               {item.icon}
@@ -366,27 +462,67 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="glass p-3 rounded-full hover:bg-white/10 transition bg-transparent border-none cursor-pointer"><Search size={20} className="text-white"/></button>
-            <button className="glass p-3 rounded-full hover:bg-white/10 transition relative bg-transparent border-none cursor-pointer">
-              <Bell size={20} className="text-white"/>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            {/* Buscador */}
+            <div className="relative group">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><Search size={18}/></div>
+                <input
+                    type="text"
+                    placeholder="Buscar reservas..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="glass pl-10 pr-4 py-3 rounded-full text-sm text-white placeholder-gray-500 focus:outline-none focus:bg-white/10 transition-all w-48 focus:w-64 border-none"
+                />
+            </div>
 
-            <div
-                onClick={() => setActiveTab('profile')}
-                className="glass px-4 py-2 rounded-full flex items-center gap-3 cursor-pointer hover:bg-white/10 transition"
-            >
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-bold">
-                 {user?.full_name?.charAt(0) || 'U'}
-              </div>
+            {/* Notificaciones */}
+            <div className="relative" ref={notificationRef}>
+                <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="glass p-3 rounded-full hover:bg-white/10 transition relative bg-transparent border-none cursor-pointer"
+                >
+                    <Bell size={20} className="text-white"/>
+                    {notifications.some(n => !n.read) && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>}
+                </button>
+                {showNotifications && (
+                    <div className="absolute right-0 top-14 w-80 glass rounded-xl border border-white/10 shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                            <span className="font-medium">Notificaciones</span>
+                            <button className="text-xs text-purple-400 bg-transparent border-none cursor-pointer" onClick={() => setNotifications(prev => prev.map(n => ({...n, read: true})))}>Marcar leídas</button>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                            {notifications.length === 0 ? (
+                                <p className="p-4 text-center text-sm text-gray-500">No hay notificaciones</p>
+                            ) : (
+                                notifications.map(n => (
+                                    <div key={n.id} className={`p-4 border-b border-white/5 hover:bg-white/5 transition ${!n.read ? 'bg-white/5' : ''}`}>
+                                        <p className="text-sm">{n.text}</p>
+                                        <p className="text-xs text-gray-500 mt-1">{n.time}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div onClick={() => setActiveTab('profile')} className="glass px-4 py-2 rounded-full flex items-center gap-3 cursor-pointer hover:bg-white/10 transition">
+              {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-bold">
+                     {user?.full_name?.charAt(0) || 'U'}
+                  </div>
+              )}
               <span className="text-sm font-medium">{user?.full_name || 'Usuario'}</span>
             </div>
           </div>
         </header>
 
-        {/* --- TABS --- */}
+        {/* --- CONTENIDO TABS --- */}
+
+        {/* HOME */}
         {activeTab === 'home' && (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="glass p-6 rounded-2xl">
                 <div className="flex items-center gap-3 mb-4">
@@ -397,11 +533,11 @@ export default function Dashboard() {
             </div>
 
             <div className="glass p-8 rounded-2xl">
-              <h2 className="text-2xl font-light mb-6">Mis reservas recientes</h2>
+              <h2 className="text-2xl font-light mb-6">Mis reservas recientes {searchQuery && "(Filtrado)"}</h2>
               <div className="space-y-4">
-                {reservations.length === 0 ? <p className="text-gray-400">No tienes reservas activas.</p> :
-                    reservations.slice(0, 3).map((res) => (
-                    <div key={res.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                {filteredReservations.length === 0 ? <p className="text-gray-400">No hay reservas que coincidan.</p> :
+                    filteredReservations.slice(0, 3).map((res) => (
+                    <div key={res.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center"><Calendar size={20} /></div>
                             <div>
@@ -430,24 +566,34 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* RESERVATIONS TAB */}
         {activeTab === 'reservations' && (
-          <div className="space-y-6">
-            {reservations.map((res) => (
-              <div key={res.id} className="glass p-6 rounded-2xl hover:bg-white/10 transition">
-                <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center"><Calendar size={24} /></div>
-                    <div>
-                      <h3 className="text-xl font-medium mb-1">{res.facility}</h3>
-                      <p className="text-gray-400 text-sm">{new Date(res.start_time).toLocaleDateString()} {new Date(res.start_time).toLocaleTimeString()} - {new Date(res.end_time).toLocaleTimeString()}</p>
-                    </div>
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {filteredReservations.length === 0 ? (
+                <div className="glass p-12 text-center rounded-2xl">
+                    <Calendar className="mx-auto text-gray-500 mb-4" size={48} />
+                    <p className="text-gray-400">No tienes reservas activas con ese criterio.</p>
                 </div>
-              </div>
-            ))}
+            ) : (
+                filteredReservations.map((res) => (
+                  <div key={res.id} className="glass p-6 rounded-2xl hover:bg-white/10 transition border border-white/5 flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center"><Calendar size={24} /></div>
+                        <div>
+                          <h3 className="text-xl font-medium mb-1">{res.facility}</h3>
+                          <p className="text-gray-400 text-sm">{new Date(res.start_time).toLocaleDateString()} {new Date(res.start_time).toLocaleTimeString()} - {new Date(res.end_time).toLocaleTimeString()}</p>
+                        </div>
+                    </div>
+                    <button className="p-3 hover:bg-red-500/20 text-red-400 rounded-full transition bg-transparent border-none cursor-pointer"><Trash2 size={20}/></button>
+                  </div>
+                ))
+            )}
           </div>
         )}
 
+        {/* BOOK TAB */}
         {activeTab === 'book' && (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-in fade-in duration-500">
             <div className="glass p-8 rounded-2xl text-center">
               <h2 className="text-2xl font-light mb-6">Realizar nueva reserva</h2>
               <button onClick={() => setShowReserveModal(true)} className="px-8 py-4 bg-white text-black rounded-full font-medium hover:bg-gray-200 transition text-lg cursor-pointer border-none">Abrir formulario</button>
@@ -455,26 +601,84 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* PROFILE TAB (CON MINIO) */}
         {activeTab === 'profile' && user && (
-          <div className="max-w-4xl glass p-8 rounded-2xl mb-8">
+          <div className="max-w-4xl glass p-8 rounded-2xl mb-8 animate-in fade-in duration-500">
               <div className="flex items-center gap-6 mb-8">
-                <div className="w-24 h-24 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-3xl font-bold">{user.full_name?.charAt(0)}</div>
-                <div><h2 className="text-2xl font-light mb-2">{user.full_name}</h2><p className="text-gray-400">Apartamento: {user.apartment}</p></div>
+                <div className="relative group">
+                    {user.avatar_url ? (
+                        <img src={user.avatar_url} alt="Avatar" className="w-32 h-32 rounded-full object-cover border-4 border-white/10" />
+                    ) : (
+                        <div className="w-32 h-32 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-4xl font-bold border-4 border-white/10">
+                            {user.full_name?.charAt(0)}
+                        </div>
+                    )}
+                    {/* Botón de subida */}
+                    <button
+                        onClick={handleAvatarClick}
+                        className="absolute bottom-0 right-0 p-2 bg-white text-black rounded-full hover:bg-gray-200 transition cursor-pointer border-none shadow-lg"
+                        disabled={uploadingAvatar}
+                    >
+                        {uploadingAvatar ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                    </button>
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                </div>
+
+                <div>
+                    <h2 className="text-3xl font-light mb-2">{user.full_name}</h2>
+                    <div className="flex items-center gap-2 text-gray-400 bg-white/5 px-3 py-1 rounded-full w-fit">
+                        <Home size={14} />
+                        <span className="text-sm">Apartamento {user.apartment}</span>
+                    </div>
+                </div>
               </div>
+
               <div className="grid grid-cols-2 gap-6">
                 <div><label className="block text-sm text-gray-400 mb-2">Email</label><input type="email" value={user.email} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" readOnly /></div>
                 <div><label className="block text-sm text-gray-400 mb-2">Teléfono</label><input type="text" value={user.phone || 'No registrado'} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" readOnly /></div>
                 <div><label className="block text-sm text-gray-400 mb-2">Dirección</label><input type="text" value={user.address || 'No registrado'} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" readOnly /></div>
                 <div><label className="block text-sm text-gray-400 mb-2">CP</label><input type="text" value={user.postal_code || 'No registrado'} className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white" readOnly /></div>
               </div>
+
+              <div className="mt-8 pt-6 border-t border-white/10 flex justify-end">
+                  <button onClick={() => setShowCompleteProfile(true)} className="flex items-center gap-2 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition border-none text-white cursor-pointer">
+                      <Settings size={16} /> Editar Datos
+                  </button>
+              </div>
           </div>
+        )}
+
+        {/* SETTINGS TAB (NUEVA) */}
+        {activeTab === 'settings' && (
+            <div className="max-w-2xl glass p-8 rounded-2xl animate-in fade-in duration-500">
+                <h2 className="text-2xl font-light mb-6">Configuración</h2>
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                        <div>
+                            <p className="font-medium">Notificaciones por Correo</p>
+                            <p className="text-sm text-gray-400">Recibe resúmenes de tus reservas.</p>
+                        </div>
+                        <div className="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div></div>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                        <div>
+                            <p className="font-medium">Tema Oscuro</p>
+                            <p className="text-sm text-gray-400">Activo por defecto.</p>
+                        </div>
+                        <div className="w-12 h-6 bg-green-500 rounded-full relative cursor-pointer"><div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div></div>
+                    </div>
+                    <button className="w-full p-4 text-red-400 hover:bg-red-500/10 rounded-xl transition text-left border border-red-500/20 bg-transparent cursor-pointer flex items-center gap-2">
+                        <AlertCircle size={20} /> Eliminar cuenta
+                    </button>
+                </div>
+            </div>
         )}
       </main>
 
       {/* --- MODAL RESERVA --- */}
       {showReserveModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-          <div className="glass p-8 rounded-2xl max-w-2xl w-full border border-white/10 h-[90vh] overflow-y-auto">
+          <div className="glass p-8 rounded-2xl max-w-2xl w-full border border-white/10 h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-light">Nueva Reserva</h2>
               <button onClick={() => setShowReserveModal(false)} className="p-2 hover:bg-white/10 rounded-lg transition cursor-pointer bg-transparent border-none text-white"><X size={24} /></button>
@@ -485,7 +689,7 @@ export default function Dashboard() {
               <div><label className="block text-sm text-gray-400 mb-2">Fecha</label><input type="date" value={newResDate} onChange={e => setNewResDate(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white scheme-dark" /></div>
 
               <div>
-                  <label className="block text-sm text-gray-400 mb-3">Horarios Disponibles (90 min)</label>
+                  <label className="block text-sm text-gray-400 mb-3">Horarios (Se actualizan en vivo)</label>
                   {loadingSlots ? (
                       <div className="flex justify-center py-4"><Loader2 className="animate-spin text-purple-500" /></div>
                   ) : (
