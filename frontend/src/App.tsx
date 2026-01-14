@@ -11,7 +11,6 @@ import PrivacyPolicy from './components/legal/PrivacyPolicy';
 import TermsConditions from './components/legal/TermsConditions';
 import SupportPage from './components/support/SupportPage';
 import PaymentGateway from './components/pages/PaymentGateway';
-import ProfilePage from './components/pages/ProfilePage';
 
 function App() {
   return (
@@ -34,7 +33,6 @@ function App() {
         {/* Rutas Privadas (Dashboard) */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/payment" element={<PaymentGateway />} />
-        <Route path="/profile" element={<ProfilePage />} />
 
         {/* Redirección por defecto */}
         <Route path="*" element={<Navigate to="/" replace />} />

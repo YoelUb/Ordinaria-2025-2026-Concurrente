@@ -2,6 +2,7 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 import random
 import uuid
+import os
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from src.db.session import get_db
@@ -11,6 +12,9 @@ from src.services.email import send_verification_email
 from src.core.security import get_password_hash
 from src.core.deps import get_current_user, get_current_admin
 from src.services.storage import upload_file
+from dotenv import load_dotenv
+
+load_dotenv()  # Cargar variables de entorno
 
 router = APIRouter()
 
@@ -33,11 +37,13 @@ def create_user(
     verification_code = "".join([str(random.randint(0, 9)) for _ in range(6)])
     code_expires = datetime.now(timezone.utc) + timedelta(minutes=15)
 
-    # Lógica de Rol (Admin vs User) - Ajustar según tu .env
     role = "user"
-    # import os
-    # if user_in.email == os.getenv("ADMIN_EMAIL"):
-    #     role = "admin"
+    admin_email_env = os.getenv("ADMIN_EMAIL")
+
+    # Comprobamos si el email del registro coincide con el del .env
+    if admin_email_env and user_in.email.strip().lower() == admin_email_env.strip().lower():
+        role = "admin"
+        print(f"ADMIN DETECTADO: Asignando rol de administrador a {user_in.email}")
 
     # Crear usuario
     new_user = User(
@@ -48,7 +54,7 @@ def create_user(
         phone=user_in.phone,
         address=user_in.address,
         postal_code=user_in.postal_code,
-        role=role,
+        role=role,  #
         is_active=False,
         verification_code=verification_code,
         verification_code_expires_at=code_expires
@@ -58,7 +64,7 @@ def create_user(
     db.commit()
     db.refresh(new_user)
 
-    # Enviar correo
+    # Enviar correo (con desvío si es admin, gestionado en services/email.py)
     background_tasks.add_task(send_verification_email, new_user.email, verification_code)
 
     return new_user
