@@ -12,9 +12,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Login social
+  // --- 1. Lógica de Autenticación Social (Backend) ---
   const authenticateWithBackendSocial = async (firebaseToken: string) => {
     try {
+      // Enviamos el token de Firebase a TU backend Python
       const response = await fetch('http://localhost:8000/api/v1/auth/login/social', {
         method: 'POST',
         headers: {
@@ -23,46 +24,55 @@ export default function LoginPage() {
         body: JSON.stringify({ token: firebaseToken }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Error en el backend');
+        throw new Error(data.detail || 'Error al validar con el servidor');
       }
 
-      const data = await response.json();
+      // Guardamos el token de sesión de TU sistema (JWT)
       localStorage.setItem('token', data.access_token);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error backend social:", error);
-      toast.error("Error al conectar con el servidor.");
-      return false;
+      throw error; // Lanzamos el error para que lo capture el toast
     }
   };
 
+  // --- 2. Manejador de Botones Sociales ---
   const handleSocialLogin = async (provider: any) => {
     setIsLoading(true);
-    const loadingToast = toast.loading('Iniciando sesión...');
+    const loadingToast = toast.loading('Conectando con proveedor...');
 
     try {
+      // Paso A: Login en Firebase (Google/GitHub)
       const result = await signInWithPopup(auth, provider);
       const token = await result.user.getIdToken();
 
-      const success = await authenticateWithBackendSocial(token);
+      // Paso B: Login en tu Backend
+      toast.loading('Verificando cuenta...', { id: loadingToast });
+      await authenticateWithBackendSocial(token);
 
-      if (success) {
-        toast.success("¡Bienvenido!", { id: loadingToast });
-        navigate('/dashboard');
-      } else {
-        toast.dismiss(loadingToast);
-      }
+      // Paso C: Éxito
+      toast.success("¡Bienvenido de nuevo!", { id: loadingToast });
+      navigate('/dashboard');
+
     } catch (error: any) {
       console.error(error);
-      toast.error('Error: ' + error.message, { id: loadingToast });
+      let msg = "Error al iniciar sesión";
+
+      // Mensajes amigables para errores comunes
+      if (error.code === 'auth/popup-closed-by-user') msg = "Has cancelado el inicio de sesión";
+      else if (error.code === 'auth/account-exists-with-different-credential') msg = "Ya existe una cuenta con este email usando otro método.";
+      else if (error.message) msg = error.message;
+
+      toast.error(msg, { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Login normal
+  // --- 3. Login Normal (Email/Contraseña) ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
