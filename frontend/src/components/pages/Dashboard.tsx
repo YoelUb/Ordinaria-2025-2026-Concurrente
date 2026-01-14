@@ -48,7 +48,7 @@ export default function Dashboard() {
           'Content-Type': 'application/json'
         };
 
-        // 1. Obtener perfil
+        // Obtener perfil
         const userResponse = await fetch('http://localhost:8000/api/v1/users/me', { headers });
         if (userResponse.ok) {
           const userData = await userResponse.json();
@@ -57,7 +57,7 @@ export default function Dashboard() {
             handleLogout(); // Token expirado
         }
 
-        // 2. Obtener reservas existentes
+        // Obtener reservas existentes
         const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', { headers });
         if (resResponse.ok) {
           const resData = await resResponse.json();
@@ -80,33 +80,32 @@ export default function Dashboard() {
     navigate('/login');
   };
 
-  // --- LOGICA DE REDIRECCIÓN AL PAGO ---
+  // Redireccion de pago
   const handleCreateReservation = () => {
     if (!newResDate || !newResTime) {
       alert("Por favor selecciona fecha y hora");
       return;
     }
 
-    // 1. Calcular fechas exactas (Backend necesita ISO format)
+    // Calcular fechas exactas
     const startDateTime = new Date(`${newResDate}T${newResTime}:00`);
 
-    // Asumimos reserva de 1.5 horas (90 minutos) para el ejemplo
+    // Asumimos reserva de 1.5 horas
     const durationMinutes = 90;
     const endDateTime = new Date(startDateTime.getTime() + durationMinutes * 60000);
 
     // Formatear hora fin para mostrarla
     const endTimeString = `${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`;
 
-    // 2. Formatear datos para visualización (Ticket)
+    // Formatear datos para visualización
     const displayDate = startDateTime.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
     const displayTime = `${newResTime} - ${endTimeString}`;
 
-    // 3. Calcular Precio (Simulado)
+    // Calcular Precio
     const price = 15.00;
     const tax = price * 0.21;
     const total = price + tax;
 
-    // 4. CERRAR MODAL Y REDIRIGIR AL PAGO
     setShowReserveModal(false);
 
     navigate('/payment', {

@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { signInWithPopup } from "firebase/auth";
+import toast from "react-hot-toast";
 import { auth, googleProvider, githubProvider } from "../../config/Firebase";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -26,18 +29,19 @@ export default function LoginPage() {
       }
 
       const data = await response.json();
-      console.log("Login Social exitoso:", data);
       localStorage.setItem('token', data.access_token);
       return true;
     } catch (error) {
       console.error("Error backend social:", error);
-      alert("Error al conectar con el servidor.");
+      toast.error("Error al conectar con el servidor.");
       return false;
     }
   };
 
   const handleSocialLogin = async (provider: any) => {
     setIsLoading(true);
+    const loadingToast = toast.loading('Iniciando sesión...');
+
     try {
       const result = await signInWithPopup(auth, provider);
       const token = await result.user.getIdToken();
@@ -45,20 +49,24 @@ export default function LoginPage() {
       const success = await authenticateWithBackendSocial(token);
 
       if (success) {
-        window.location.href = '/';
+        toast.success("¡Bienvenido!", { id: loadingToast });
+        navigate('/dashboard');
+      } else {
+        toast.dismiss(loadingToast);
       }
     } catch (error: any) {
       console.error(error);
-      alert('Error: ' + error.message);
+      toast.error('Error: ' + error.message, { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- Login normal ---
+  // Login normal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    const loadingToast = toast.loading('Verificando credenciales...');
 
     try {
       const formData = new URLSearchParams();
@@ -73,31 +81,29 @@ export default function LoginPage() {
         body: formData,
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Credenciales incorrectas');
+        throw new Error(data.detail || 'Credenciales incorrectas');
       }
 
-      const data = await response.json();
-      console.log("Login tradicional exitoso:", data);
-
-      // Guardamos el token real
+      // Guardamos el token
       localStorage.setItem('token', data.access_token);
 
-      // Redirigimos
-      alert('¡Bienvenido de vuelta!');
-      window.location.href = '/';
+      // Éxito y redirección
+      toast.success('¡Bienvenido de vuelta!', { id: loadingToast });
+      navigate('/dashboard');
 
     } catch (error: any) {
       console.error("Error login:", error);
-      alert("Error: " + error.message);
+      toast.error(error.message || "Error al iniciar sesión", { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
+    <div className="min-h-screen bg-black text-white overflow-hidden relative flex flex-col">
       {/* Fondo */}
       <div className="fixed inset-0 z-0">
         <img
@@ -109,35 +115,35 @@ export default function LoginPage() {
       </div>
 
       {/* Menu */}
-      <nav className="relative z-10 px-6 py-6">
+      <nav className="relative z-10 px-6 py-6 w-full">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <button
-             onClick={() => window.location.href = '/'}
+             onClick={() => navigate('/')}
              className="flex items-center gap-2 hover:opacity-70 transition cursor-pointer bg-transparent border-none"
           >
             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
               <span className="text-black font-bold text-sm">R</span>
             </div>
-            <span className="font-semibold">RESIDENCIAL</span>
+            <span className="font-semibold text-lg text-white">RESIDENCIAL</span>
           </button>
           <button
-             onClick={() => window.location.href = '/register'}
+             onClick={() => navigate('/register')}
              className="text-sm text-gray-400 hover:text-white transition cursor-pointer bg-transparent border-none"
           >
-            ¿No tienes cuenta? <span className="font-medium">Regístrate</span>
+            ¿No tienes cuenta? <span className="font-medium text-white">Regístrate</span>
           </button>
         </div>
       </nav>
 
-      {/* Formulario registro */}
-      <div className="relative z-10 flex items-center justify-center px-6 py-20">
+      {/* Formulario Login */}
+      <div className="relative z-10 flex-grow flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           {/* Header */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 glass rounded-full mb-6">
-              <Lock size={28} />
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full mb-6">
+              <Lock size={28} className="text-white" />
             </div>
-            <h1 className="text-5xl md:text-6xl font-extralight mb-4 text-glow">
+            <h1 className="text-4xl md:text-5xl font-extralight mb-4 text-white">
               Bienvenido<br/>
               <span className="font-semibold">de vuelta.</span>
             </h1>
@@ -147,22 +153,22 @@ export default function LoginPage() {
           </div>
 
           {/* Formulario */}
-          <form onSubmit={handleSubmit} className="glass p-8 rounded-3xl space-y-6">
+          <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl space-y-6 shadow-2xl">
             {/* Campo email */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2 ml-1">
                 Correo electrónico
               </label>
-              <div className="relative">
+              <div className="relative group">
                 <Mail
                    size={20}
-                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
+                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors"
                 />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 rounded-xl text-white bg-white/5 border border-white/10 focus:bg-white/10 focus:border-white/30 focus:outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-4 rounded-xl text-white bg-white/5 border border-white/10 focus:bg-white/10 focus:border-white/30 focus:ring-2 focus:ring-white/10 focus:outline-none transition-all placeholder-gray-600"
                   placeholder="tu@email.com"
                   required
                 />
@@ -171,34 +177,34 @@ export default function LoginPage() {
 
             {/* Campo contraseña */}
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2 ml-1">
                 Contraseña
               </label>
-              <div className="relative">
+              <div className="relative group">
                 <Lock
                    size={20}
-                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
+                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors"
                 />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-4 rounded-xl text-white bg-white/5 border border-white/10 focus:bg-white/10 focus:border-white/30 focus:outline-none transition-all"
+                  className="w-full pl-12 pr-12 py-4 rounded-xl text-white bg-white/5 border border-white/10 focus:bg-white/10 focus:border-white/30 focus:ring-2 focus:ring-white/10 focus:outline-none transition-all placeholder-gray-600"
                   placeholder="••••••••"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition bg-transparent border-none cursor-pointer"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition bg-transparent border-none cursor-pointer p-1"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
 
-            {/* Si se olvio la password */}
-            <div className="flex items-center justify-between text-sm">
+            {/* Opciones extra */}
+            <div className="flex items-center justify-between text-sm px-1">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
                    type="checkbox"
@@ -210,20 +216,23 @@ export default function LoginPage() {
               </label>
               <button
                 type="button"
-                className="text-gray-400 hover:text-white transition font-medium bg-transparent border-none cursor-pointer"
+                className="text-gray-400 hover:text-white transition font-medium bg-transparent border-none cursor-pointer p-0"
               >
                 ¿Olvidaste tu contraseña?
               </button>
             </div>
 
-            {/* Boton de envio */}
+            {/* Botón de envío */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-white text-black py-4 rounded-full font-medium text-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer border-none"
+              className="w-full bg-white text-black py-4 rounded-xl font-medium text-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer border-none shadow-lg shadow-white/5"
             >
               {isLoading ? (
-                <span>Accediendo...</span>
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  <span>Accediendo...</span>
+                </>
               ) : (
                 <>
                   <span>Acceder</span>
@@ -238,7 +247,7 @@ export default function LoginPage() {
                 <div className="w-full border-t border-white/10" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-black text-gray-500">
+                <span className="px-4 bg-black/50 backdrop-blur-sm text-gray-500 rounded-full">
                   o continúa con
                 </span>
               </div>
@@ -249,7 +258,8 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => handleSocialLogin(googleProvider)}
-                className="py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isLoading}
+                className="py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -257,17 +267,18 @@ export default function LoginPage() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                <span className="text-sm font-medium">Google</span>
+                <span className="text-sm font-medium text-white">Google</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSocialLogin(githubProvider)}
-                className="py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isLoading}
+                className="py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z" />
                 </svg>
-                <span className="text-sm font-medium">GitHub</span>
+                <span className="text-sm font-medium text-white">GitHub</span>
               </button>
             </div>
 
@@ -275,7 +286,11 @@ export default function LoginPage() {
             <div className="text-center mt-8">
               <p className="text-sm text-gray-500">
                 ¿Necesitas ayuda?{' '}
-                <button type="button" onClick={() => window.location.href = '/support'} className="text-white hover:text-gray-300 transition font-medium bg-transparent border-none cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => navigate('/support')}
+                  className="text-white hover:text-gray-300 transition font-medium bg-transparent border-none cursor-pointer underline decoration-transparent hover:decoration-white"
+                >
                   Contacta con soporte
                 </button>
               </p>

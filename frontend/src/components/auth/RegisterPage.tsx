@@ -3,8 +3,9 @@ import { Lock, Mail, Eye, EyeOff, User, Phone, ArrowRight, Home, AlertCircle, Ma
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider, githubProvider } from "../../config/Firebase";
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
-// --- Expresiones Regulares ---
+// Expresiones regulares
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{8,}$/;
 const NAME_REGEX = /^[a-zA-ZÀ-ÿ\s]+$/;
@@ -28,7 +29,7 @@ type PhotonFeature = {
 export default function RegisterPage() {
     const navigate = useNavigate();
 
-    // --- Estados del Formulario ---
+    // Formulario
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -42,21 +43,18 @@ export default function RegisterPage() {
 
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-    // --- Estados de UI ---
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [acceptTerms, setAcceptTerms] = useState(false);
 
-    // --- Estados para Autocompletado de Direcciones ---
     const [addressSuggestions, setAddressSuggestions] = useState<PhotonFeature[]>([]);
     const [showAddressMenu, setShowAddressMenu] = useState(false);
     const [loadingAddress, setLoadingAddress] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // --- Lógica de Autocompletado (Photon) ---
+    // Logica autocompletado con photon
     useEffect(() => {
-        // Solo buscamos si hay más de 3 letras y el menú está activo
         if (formData.address.length < 3 || !showAddressMenu) {
             setAddressSuggestions([]);
             return;
@@ -65,7 +63,7 @@ export default function RegisterPage() {
         const timeoutId = setTimeout(async () => {
             setLoadingAddress(true);
             try {
-                // NOTA: Quitamos &lang=es para evitar errores 400 en la API pública
+
                 const response = await fetch(
                     `https://photon.komoot.io/api/?q=${encodeURIComponent(formData.address)}&limit=5`
                 );
@@ -97,7 +95,7 @@ export default function RegisterPage() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Función para seleccionar una dirección de la lista (Garantiza dirección real)
+    // Función para seleccionar una dirección de la lista
     const handleSelectAddress = (feature: PhotonFeature) => {
         const p = feature.properties;
 
@@ -210,38 +208,51 @@ export default function RegisterPage() {
             return true;
         } catch (error) {
             console.error("Error backend:", error);
-            alert("Error conectando con el servidor.");
+            toast.error("Error conectando con el servidor.");
             return false;
         }
     };
 
     const handleSocialLogin = async (provider: any) => {
         if (!acceptTerms) {
-            alert('Por favor, acepta los términos y condiciones.');
+            toast.error('Por favor, acepta los términos y condiciones.');
             return;
         }
         setIsLoading(true);
+        const loadingToast = toast.loading('Conectando con proveedor social...');
+
         try {
             const result = await signInWithPopup(auth, provider);
             const token = await result.user.getIdToken();
             const success = await authenticateWithBackendSocial(token);
-            if (success) navigate('/dashboard');
+            if (success) {
+                toast.success("¡Bienvenido!", { id: loadingToast });
+                navigate('/dashboard');
+            } else {
+                toast.dismiss(loadingToast);
+            }
         } catch (error: any) {
             console.error(error);
-            alert('Error en registro social: ' + error.message);
+            toast.error('Error: ' + error.message, { id: loadingToast });
         } finally {
             setIsLoading(false);
         }
     };
 
    const handleSubmit = async () => {
-    if (!validateForm()) return;
+    // 1. Validaciones
+    if (!validateForm()) {
+        toast.error("Por favor revisa los errores del formulario");
+        return;
+    }
     if (!acceptTerms) {
-        alert('Debes aceptar los términos y condiciones');
+        toast.error('Debes aceptar los términos y condiciones');
         return;
     }
 
     setIsLoading(true);
+    const loadingToast = toast.loading('Creando tu cuenta...');
+
     try {
         const payload = {
             email: formData.email,
@@ -270,13 +281,15 @@ export default function RegisterPage() {
         }
 
         localStorage.setItem('pendingVerificationEmail', formData.email);
-        alert('¡Cuenta creada con éxito! Revisa tu correo.');
+        toast.success('¡Cuenta creada! Revisa tu correo.', { id: loadingToast, duration: 5000 });
         navigate('/verify-email');
 
     } catch (error: any) {
         console.error("Error registro:", error);
         if (error.message !== "Email duplicado") {
-            alert('Ocurrió un error: ' + error.message);
+            toast.error(error.message || 'Ocurrió un error inesperado', { id: loadingToast });
+        } else {
+            toast.error("El email ya está registrado", { id: loadingToast });
         }
     } finally {
         setIsLoading(false);
@@ -358,9 +371,9 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* Direccion con autocompletado */}
+                        {/* FILA 2: DIRECCIÓN (AUTOCOMPLETE) Y CP */}
                         <div className="grid md:grid-cols-3 gap-6">
-                            {/* input direccion con photon */}
+                            {/* INPUT DE DIRECCIÓN CON PHOTON */}
                             <div className="md:col-span-2 relative" ref={wrapperRef}>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">Dirección</label>
                                 <div className="relative">
@@ -383,7 +396,7 @@ export default function RegisterPage() {
                                     )}
                                 </div>
 
-                                {/* Desplegable con sugerencias*/}
+                                {/* DESPLEGABLE DE SUGERENCIAS */}
                                 {addressSuggestions.length > 0 && (
                                     <ul className="absolute z-50 w-full mt-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto scrollbar-hide">
                                         {addressSuggestions.map((item, index) => {
@@ -409,7 +422,7 @@ export default function RegisterPage() {
                                 {errors.address && <div className="text-red-300 text-sm mt-1 ml-1 flex gap-1"><AlertCircle size={14}/> {errors.address}</div>}
                             </div>
 
-                            {/* Codigo postal */}
+                            {/* CÓDIGO POSTAL */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">C. Postal</label>
                                 <div className="relative">
@@ -427,7 +440,7 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* Casa y correo */}
+                        {/* FILA 3: APARTAMENTO Y EMAIL */}
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">Apartamento (Nº y Letra)</label>
@@ -447,7 +460,7 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* Contraseñas doble*/}
+                        {/* FILA 4: CONTRASEÑAS */}
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-2">Contraseña</label>
@@ -473,7 +486,7 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
-                        {/* Terminos, politicas y boton*/}
+                        {/* TÉRMINOS Y BOTÓN */}
                         <div className="pt-4">
                             <label className="flex items-start gap-3 cursor-pointer group">
                                 <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} className="w-5 h-5 rounded border-gray-600 bg-transparent cursor-pointer mt-0.5 accent-white"/>
