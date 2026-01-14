@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// --- Expresiones Regulares (Validación Estricta) ---
+// --- Expresiones Regulares ---
 const APARTMENT_REGEX = /^\d+\s*[A-Z]+$/;
 const POSTAL_CODE_REGEX = /^\d{5}$/;
 const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
@@ -27,7 +27,7 @@ interface UserProfile {
   phone: string;
   postal_code?: string;
   address?: string;
-  avatar_url?: string; // URL de la imagen en MinIO
+  avatar_url?: string;
 }
 
 interface Notification {
@@ -58,24 +58,25 @@ export default function Dashboard() {
 
   // Referencias
   const toastShownRef = useRef(false);
+  const notificationProcessedRef = useRef(false); // EVITA DUPLICIDAD AL VOLVER DEL PAGO
   const wrapperRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados de Interfaz
+  // Estados UI
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showCompleteProfile, setShowCompleteProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Estados de Datos
+  // Estados Datos
   const [user, setUser] = useState<UserProfile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([
       { id: 1, text: "Bienvenido al sistema residencial", read: true, time: "Sistema" }
   ]);
 
-  // Estados de Carga
+  // Estados Carga
   const [loading, setLoading] = useState(true);
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -87,12 +88,12 @@ export default function Dashboard() {
   const [busySlots, setBusySlots] = useState<string[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
 
-  // Perfil & Direcciones
+  // Perfil
   const [profileForm, setProfileForm] = useState({ phone: '', address: '', apartment: '', postal_code: '' });
   const [addressSuggestions, setAddressSuggestions] = useState<PhotonFeature[]>([]);
   const [showAddressMenu, setShowAddressMenu] = useState(false);
 
-  // --- 1. Cargar Datos y Polling (1s) ---
+  // --- 1. Cargar Datos y Polling ---
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
@@ -101,7 +102,7 @@ export default function Dashboard() {
       try {
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-        // Cargar Perfil
+        // Perfil
         const userResponse = await fetch('http://localhost:8000/api/v1/users/me', { headers });
         if (userResponse.status === 401) { handleLogout(); return; }
 
@@ -109,7 +110,7 @@ export default function Dashboard() {
           const userData = await userResponse.json();
           setUser(userData);
 
-          // Verificar si faltan datos (Solo 1 vez)
+          // Verificar perfil incompleto
           if ((!userData.phone || !userData.address || !userData.apartment) && !showCompleteProfile) {
              setProfileForm(prev => ({
                  phone: userData.phone || prev.phone,
@@ -126,11 +127,10 @@ export default function Dashboard() {
           }
         }
 
-        // Cargar Reservas
+        // Reservas (Polling)
         const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', { headers });
         if (resResponse.ok) {
           const resData = await resResponse.json();
-          // Ordenar por fecha más reciente
           const sortedRes = resData.sort((a: Reservation, b: Reservation) =>
             new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
           );
@@ -153,18 +153,21 @@ export default function Dashboard() {
         if (document.visibilityState === 'visible') {
             fetchData();
         }
-    }, 1000); // Polling cada 1 segundo
+    }, 1000);
 
     return () => clearInterval(intervalId);
   }, [navigate]);
 
-  // --- 2. Detectar Notificaciones tras Pago (CORREGIDO) ---
+  // --- 2. Notificaciones tras Pago Exitoso ---
   useEffect(() => {
-      // Verificamos la bandera 'paymentSuccess' que debe poner el PaymentGateway al terminar
+      // Evita duplicidad estricta usando referencia
+      if (notificationProcessedRef.current) return;
+
       const paymentSuccess = localStorage.getItem('paymentSuccess');
 
       if (paymentSuccess) {
-          // 1. Crear notificación
+          notificationProcessedRef.current = true; // Marcamos como procesado
+
           const newNotif = {
               id: Date.now(),
               text: "¡Reserva confirmada exitosamente!",
@@ -173,16 +176,14 @@ export default function Dashboard() {
           };
           setNotifications(prev => [newNotif, ...prev]);
 
-          // 2. Limpiar bandera para que no salga al recargar
-          localStorage.removeItem('paymentSuccess');
+          localStorage.removeItem('paymentSuccess'); // Limpiamos bandera
 
-          // 3. Mostrar feedback visual
-          setShowNotifications(true); // Abrir menú
-          setTimeout(() => setShowNotifications(false), 3000); // Cerrar a los 3s
+          setShowNotifications(true);
+          setTimeout(() => setShowNotifications(false), 4000);
       }
   }, []);
 
-  // --- 3. Disponibilidad (Slots) con Polling (1s) ---
+  // --- 3. Disponibilidad (Slots) ---
   useEffect(() => {
       if (!showReserveModal) return;
 
@@ -235,7 +236,6 @@ export default function Dashboard() {
     return () => clearTimeout(timeoutId);
   }, [profileForm.address, showAddressMenu]);
 
-  // Cerrar menús al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
         if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -262,18 +262,15 @@ export default function Dashboard() {
     setShowAddressMenu(false);
   };
 
-  // --- 5. Lógica de Avatar (MinIO) ---
-  const handleAvatarClick = () => {
-      fileInputRef.current?.click();
-  };
+  // --- 5. Avatar (MinIO) ---
+  const handleAvatarClick = () => { fileInputRef.current?.click(); };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
       if (!file.type.startsWith('image/')) {
-          toast.error("Por favor sube una imagen válida");
-          return;
+          toast.error("Formato de imagen no válido"); return;
       }
 
       setUploadingAvatar(true);
@@ -284,33 +281,27 @@ export default function Dashboard() {
           const formData = new FormData();
           formData.append('file', file);
 
-          // Endpoint backend (Debes tenerlo implementado en src/routers/users.py)
           const response = await fetch('http://localhost:8000/api/v1/users/me/avatar', {
               method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${token}`
-              },
+              headers: { 'Authorization': `Bearer ${token}` },
               body: formData
           });
 
           if (response.ok) {
               const data = await response.json();
-              // Actualizamos la URL del usuario con la que devuelve MinIO
               setUser(prev => prev ? { ...prev, avatar_url: data.avatar_url } : null);
               toast.success("Foto actualizada", { id: loadingToast });
           } else {
-              // Si falla el backend real, lanzamos error
-              throw new Error("Fallo en la subida");
+              throw new Error("Error en subida");
           }
       } catch (error) {
-          console.error(error);
-          toast.error("Error al subir imagen. ¿MinIO está activo?", { id: loadingToast });
+          toast.error("Error al subir imagen", { id: loadingToast });
       } finally {
           setUploadingAvatar(false);
       }
   };
 
-  // --- 6. Buscador (Filtrado Global) ---
+  // --- 6. Buscador ---
   const filteredReservations = reservations.filter(res => {
       if (!searchQuery) return true;
       const query = searchQuery.toLowerCase();
@@ -327,20 +318,20 @@ export default function Dashboard() {
       e.preventDefault();
 
       if(!profileForm.phone.trim() || !profileForm.apartment.trim() || !profileForm.address.trim()) {
-          toast.error("Todos los campos son obligatorios."); return;
+          toast.error("Campos obligatorios vacíos."); return;
       }
       if (profileForm.address.trim().length < 5 || /^\d+$/.test(profileForm.address)) {
-          toast.error("Dirección inválida."); return;
+          toast.error("Dirección no válida."); return;
       }
       const cleanPhone = profileForm.phone.replace(/[\s-]/g, '');
       if (!PHONE_REGEX.test(cleanPhone)) {
           toast.error("Teléfono inválido."); return;
       }
       if (!APARTMENT_REGEX.test(profileForm.apartment.toUpperCase())) {
-          toast.error("Apartamento incorrecto (Ej: 4B)."); return;
+          toast.error("Apartamento inválido (Ej: 4B)."); return;
       }
       if (!POSTAL_CODE_REGEX.test(profileForm.postal_code)) {
-          toast.error("Código Postal debe tener 5 dígitos."); return;
+          toast.error("CP debe ser 5 dígitos."); return;
       }
 
       setUpdatingProfile(true);
@@ -374,14 +365,22 @@ export default function Dashboard() {
       }
   };
 
+  // --- 7. Crear Reserva (Solo Redirección) ---
   const handleCreateReservation = () => {
-    if (!selectedTimeSlot) { toast.error("Selecciona un horario"); return; }
+    // 1. Validaciones previas
+    if (!selectedTimeSlot) {
+        toast.error("Selecciona un horario");
+        return;
+    }
     if (!user?.apartment || !user?.phone) {
-        toast.error("Perfil incompleto"); setShowCompleteProfile(true); return;
+        toast.error("Perfil incompleto. Rellena tus datos.");
+        setShowCompleteProfile(true);
+        return;
     }
 
+    // 2. Preparar datos para el pago
     const startDateTime = new Date(`${newResDate}T${selectedTimeSlot}:00`);
-    const endDateTime = new Date(startDateTime.getTime() + 90 * 60000);
+    const endDateTime = new Date(startDateTime.getTime() + 90 * 60000); // 90 min
     const endTimeString = endDateTime.toTimeString().slice(0, 5);
     const displayDate = startDateTime.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -389,11 +388,25 @@ export default function Dashboard() {
     const tax = price * 0.21;
     const total = price + tax;
 
+    // 3. Cerrar modal y navegar (SIN LLAMAR A LA API DE RESERVAS AÚN)
     setShowReserveModal(false);
+
     navigate('/payment', {
       state: {
-        reservationData: { facility: newResFacility, start_time: startDateTime.toISOString(), end_time: endDateTime.toISOString() },
-        displayData: { facility: newResFacility, date: displayDate, time: `${selectedTimeSlot} - ${endTimeString}`, duration: '1h 30m', price, tax, total }
+        // Datos técnicos para el backend al confirmar pago
+        reservationData: {
+            facility: newResFacility,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString()
+        },
+        // Datos visuales para el recibo
+        displayData: {
+            facility: newResFacility,
+            date: displayDate,
+            time: `${selectedTimeSlot} - ${endTimeString}`,
+            duration: '1h 30m',
+            price, tax, total
+        }
       }
     });
   };

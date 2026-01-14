@@ -9,8 +9,8 @@ import toast from 'react-hot-toast';
 const NAME_REGEX = /^[a-zA-ZÀ-ÿ\s]+$/;
 const APARTMENT_REGEX = /^\d+\s*[A-Z]+$/;
 const POSTAL_CODE_REGEX = /^\d{5}$/;
-const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
-
+const PHONE_REGEX = /^(6|7)[0-9]{8}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type PhotonFeature = {
     properties: {
         name?: string;
@@ -118,6 +118,13 @@ export default function RegisterPage() {
             newErrors.name = "Mínimo 3 caracteres.";
         } else if (!NAME_REGEX.test(formData.name)) {
             newErrors.name = "Solo letras permitidas.";
+        }
+
+        // Validar Email
+        if (!formData.email.trim()) {
+            newErrors.email = "El email es obligatorio.";
+        } else if (!EMAIL_REGEX.test(formData.email)) {
+            newErrors.email = "Formato de email inválido.";
         }
 
         // Validar Dirección (No solo números)

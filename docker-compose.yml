@@ -15,18 +15,30 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
-    # El backend no arrancará hasta que este test pase.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # --- Servicio de Almacenamiento (MinIO)
+  minio:
+    image: minio/minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
   # --- Servicio de backend con FastAPI ---
   web:
     build: .
-    # Ejecuta migraciones (alembic)
-    # Si sale bien, arranca el servidor
+    # Ejecuta migraciones y arranca
     command: sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - .:/app
@@ -38,6 +50,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_started
 
   # --- Servicio frontend (React + Vite) ---
   frontend:
@@ -54,3 +68,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

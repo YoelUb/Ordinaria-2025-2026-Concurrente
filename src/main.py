@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from src.core.config import settings
 from src.services.firebase import initialize_firebase
 from src.routers import users, auth, reservations
+from src.services.storage import init_bucket
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,3 +37,8 @@ app.include_router(reservations.router, prefix="/api/v1/reservations", tags=["Re
 @app.get("/")
 def root():
     return {"message": "API Reservas Vecinos Funcionando "}
+
+
+@app.on_event("startup")
+def startup_event():
+    init_bucket()
