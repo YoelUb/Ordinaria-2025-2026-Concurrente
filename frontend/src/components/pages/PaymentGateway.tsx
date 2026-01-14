@@ -105,14 +105,14 @@ export default function PaymentGateway() {
             }
 
             setStep('success');
-            toast.success("Reserva confirmada con éxito");
+            localStorage.setItem('paymentSuccess', 'true');
+            // NO establecemos isProcessing a false aquí para evitar doble click accidental en la pantalla de éxito
 
         } catch (error: any) {
             console.error(error);
             setStep('error');
             toast.error(error.message);
-        } finally {
-            setIsProcessing(false);
+            setIsProcessing(false); // Solo desbloqueamos si falla
         }
     };
 
@@ -133,9 +133,9 @@ export default function PaymentGateway() {
     };
 
     const handleSubmit = () => {
-        if (isProcessing) return;
+        if (isProcessing) return; // BLOQUEO DOBLE CLICK
         if (validateCard()) {
-            setIsProcessing(true);
+            setIsProcessing(true); // BLOQUEO INMEDIATO
             simulatePayment();
         } else {
             toast.error("Por favor, revisa los datos de la tarjeta");
@@ -150,7 +150,7 @@ export default function PaymentGateway() {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white overflow-hidden">
+        <div className="min-h-screen bg-brand-dark text-white overflow-hidden">
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
                 * { font-family: 'Inter', sans-serif; }
@@ -158,19 +158,18 @@ export default function PaymentGateway() {
                 .input-field { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
                 .input-field:focus { border-color: rgba(255, 255, 255, 0.3); outline: none; }
                 .input-field.error { border-color: rgba(239, 68, 68, 0.5); }
-                .ticket-perforation { background-image: radial-gradient(circle, transparent 50%, rgba(255,255,255,0.05) 50%); background-size: 20px 20px; }
             `}</style>
 
             <div className="fixed inset-0 z-0">
                 <img src="/images/comunidad_2.jpg" alt="Background" className="w-full h-full object-cover opacity-10"/>
-                <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black"/>
+                <div className="absolute inset-0 bg-gradient-to-b from-brand-dark via-brand-dark/95 to-brand-dark"/>
             </div>
 
             <nav className="relative z-10 px-6 py-6 border-b border-white/10">
                 <div className="max-w-5xl mx-auto flex justify-between items-center">
                     <button
                         onClick={() => navigate('/dashboard')}
-                        disabled={isProcessing}
+                        disabled={isProcessing && step !== 'success'}
                         className="flex items-center gap-2 text-gray-400 hover:text-white transition bg-transparent border-none cursor-pointer disabled:opacity-50"
                     >
                         <ArrowLeft size={20}/>
@@ -192,7 +191,7 @@ export default function PaymentGateway() {
                             <div className="lg:col-span-3">
                                 <div className="mb-8">
                                     <h1 className="text-4xl md:text-5xl font-extralight mb-3">
-                                        Método de <span className="font-semibold text-purple-400">Pago</span>
+                                        Método de <span className="font-semibold text-brand-primary">Pago</span>
                                     </h1>
                                     <p className="text-gray-400 font-light">Transacción segura encriptada punto a punto.</p>
                                 </div>
@@ -272,7 +271,7 @@ export default function PaymentGateway() {
                                         <button
                                             onClick={handleSubmit}
                                             disabled={isProcessing}
-                                            className="w-full py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-gray-200 transition flex items-center justify-center gap-2 cursor-pointer border-none disabled:opacity-50"
+                                            className="w-full py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-gray-200 transition flex items-center justify-center gap-2 cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isProcessing ? <><Loader2 className="animate-spin" size={20}/> Procesando...</> : <><Lock size={18}/> Pagar {displayData.total?.toFixed(2)}€</>}
                                         </button>
@@ -282,7 +281,7 @@ export default function PaymentGateway() {
                             </div>
 
                             <div className="lg:col-span-2">
-                                <div className="glass p-8 rounded-3xl sticky top-8 border-purple-500/20">
+                                <div className="glass p-8 rounded-3xl sticky top-8 border-brand-primary/20">
                                     <h3 className="text-xl font-medium mb-6">Detalles de Reserva</h3>
                                     <div className="space-y-4 mb-6">
                                         <div className="flex justify-between items-start">
@@ -294,7 +293,7 @@ export default function PaymentGateway() {
                                         <div>
                                             <p className="text-gray-400 text-xs mb-1 uppercase">Fecha y Hora</p>
                                             <p className="font-medium">{displayData.date}</p>
-                                            <p className="text-sm text-purple-400 font-mono">{displayData.time}</p>
+                                            <p className="text-sm text-brand-primary font-mono">{displayData.time}</p>
                                         </div>
                                     </div>
                                     <div className="border-t border-white/10 pt-6 space-y-3">
@@ -318,11 +317,11 @@ export default function PaymentGateway() {
 
                     {step === 'processing' && (
                         <div className="flex items-center justify-center min-h-[500px]">
-                            <div className="glass p-12 rounded-3xl text-center max-w-md w-full border-purple-500/30">
-                                <Loader2 size={64} className="animate-spin text-purple-500 mx-auto mb-8" />
+                            <div className="glass p-12 rounded-3xl text-center max-w-md w-full border-brand-primary/30">
+                                <Loader2 size={64} className="animate-spin text-brand-primary mx-auto mb-8" />
                                 <h2 className="text-3xl font-light mb-4 italic">Verificando <span className="font-bold not-italic">pago...</span></h2>
                                 <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden mt-6">
-                                    <div className="bg-purple-500 h-full transition-all duration-300" style={{width: `${progress}%`}}></div>
+                                    <div className="bg-brand-primary h-full transition-all duration-300" style={{width: `${progress}%`}}></div>
                                 </div>
                             </div>
                         </div>
@@ -347,7 +346,7 @@ export default function PaymentGateway() {
                             </div>
 
                             <div className="glass p-8 rounded-3xl relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-primary to-brand-secondary"></div>
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <p className="font-bold text-lg mb-1">TICKET DE ACCESO</p>

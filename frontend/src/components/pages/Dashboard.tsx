@@ -64,8 +64,8 @@ export default function Dashboard() {
   const notificationProcessedRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref para perfil
-  const settingsFileInputRef = useRef<HTMLInputElement>(null); // Ref para configuración
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const settingsFileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados UI
   const [showReserveModal, setShowReserveModal] = useState(false);
@@ -150,14 +150,15 @@ export default function Dashboard() {
 
     fetchData();
 
+    // CAMBIO IMPORTANTE: Polling cada 30 segundos en lugar de 1 segundo
     const intervalId = setInterval(() => {
         if (document.visibilityState === 'visible') {
             fetchData();
         }
-    }, 1000);
+    }, 30000);
 
     return () => clearInterval(intervalId);
-  }, [navigate]);
+  }, [navigate]); // Quitamos dependencias innecesarias para evitar re-creación del intervalo
 
   // --- 2. Notificaciones ---
   useEffect(() => {
@@ -201,13 +202,16 @@ export default function Dashboard() {
           } catch (error) {
               console.error(error);
           } finally {
-              if (loadingSlots) setLoadingSlots(false);
+              // Pequeño fix: solo cambiamos loading si estaba true
+              setLoadingSlots((prev) => prev ? false : prev);
           }
       };
 
       setLoadingSlots(true);
       fetchAvailability();
-      const interval = setInterval(fetchAvailability, 1000);
+
+      // CAMBIO IMPORTANTE: Polling de disponibilidad cada 10 segundos en lugar de 1 segundo
+      const interval = setInterval(fetchAvailability, 10000);
       return () => clearInterval(interval);
   }, [newResFacility, newResDate, showReserveModal]);
 
@@ -252,7 +256,6 @@ export default function Dashboard() {
   };
 
   // --- 5. Avatar (MinIO) ---
-  // Función genérica para abrir el selector de archivo
   const triggerFileInput = (ref: React.RefObject<HTMLInputElement>) => {
       ref.current?.click();
   };
