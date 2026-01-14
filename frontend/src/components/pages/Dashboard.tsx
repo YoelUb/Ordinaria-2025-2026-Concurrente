@@ -179,7 +179,7 @@ export default function Dashboard() {
       }
   }, []);
 
-  // --- 3. Disponibilidad ---
+  // Disponibilidad
   useEffect(() => {
       if (!showReserveModal) return;
 

@@ -25,16 +25,16 @@ export default function PaymentGateway() {
 
     if (!displayData) return null;
 
-    // Validacion datos estricta
+    // --- VALIDACIÓN DE DATOS (Se ejecuta al pulsar Pagar) ---
     const validateCard = () => {
         const newErrors: any = {};
 
-        // Validar número (16 dígitos)
+        // 1. Validar número (16 dígitos)
         const cardNumber = cardData.number.replace(/\s/g, '');
         if (!cardNumber) newErrors.number = 'El número es obligatorio';
         else if (cardNumber.length !== 16 || !/^\d+$/.test(cardNumber)) newErrors.number = 'Número inválido (16 dígitos)';
 
-        // Validar nombre (Sin números y mínimo 3 letras)
+        // 2. Validar nombre (Sin números y mínimo 3 letras)
         const NAME_REGEX = /^[a-zA-ZÀ-ÿ\s]+$/;
         if (!cardData.name.trim()) {
             newErrors.name = 'El nombre es obligatorio';
@@ -44,41 +44,62 @@ export default function PaymentGateway() {
             newErrors.name = 'No se permiten números en el nombre';
         }
 
-        // Validar expiración (MM/YY)
-        if (!cardData.expiry) newErrors.expiry = 'Obligatorio';
-        else if (!/^\d{2}\/\d{2}$/.test(cardData.expiry)) newErrors.expiry = 'Formato MM/AA';
+        // 3. Validar expiración (Formato y Fecha Real)
+        if (!cardData.expiry) {
+            newErrors.expiry = 'Obligatorio';
+        } else if (!/^\d{2}\/\d{2}$/.test(cardData.expiry)) {
+            newErrors.expiry = 'Formato MM/AA';
+        } else {
+            // Lógica para comprobar si la tarjeta está caducada
+            const [month, year] = cardData.expiry.split('/').map(Number);
+            const now = new Date();
+            const currentYear = parseInt(now.getFullYear().toString().slice(-2));
+            const currentMonth = now.getMonth() + 1;
 
-        // Validar CVV
+            if (month < 1 || month > 12) {
+                newErrors.expiry = 'Mes inválido';
+            } else if (year < currentYear || (year === currentYear && month < currentMonth)) {
+                newErrors.expiry = 'Tarjeta caducada';
+            }
+        }
+
+        // 4. Validar CVV (Estricto 3 dígitos)
         if (!cardData.cvv) newErrors.cvv = 'Obligatorio';
-        else if (!/^\d{3,4}$/.test(cardData.cvv)) newErrors.cvv = '3-4 dígitos';
+        else if (!/^\d{3}$/.test(cardData.cvv)) newErrors.cvv = 'Debe ser de 3 dígitos';
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
+    // --- FORMATEO EN TIEMPO REAL (Mientras escribes) ---
     const handleInputChange = (field: string, value: string) => {
         let formattedValue = value;
 
         if (field === 'name') {
-            // Filtro instantáneo: borra cualquier número mientras escribe
+            // Elimina números y pone mayúsculas
             formattedValue = value.replace(/[0-9]/g, '').toUpperCase();
         }
 
         if (field === 'number') {
-            formattedValue = value.replace(/\s/g, '').replace(/(\d{4})/g, '$1 ').trim();
+            // Solo números y grupos de 4
+            const onlyNumbers = value.replace(/\D/g, '');
+            formattedValue = onlyNumbers.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
             if (formattedValue.length > 19) return;
         }
 
         if (field === 'expiry') {
+            // Solo números y añade la barra /
             formattedValue = value.replace(/\D/g, '');
             if (formattedValue.length >= 2) formattedValue = formattedValue.slice(0, 2) + '/' + formattedValue.slice(2, 4);
             if (formattedValue.length > 5) return;
         }
 
         if (field === 'cvv') {
-            formattedValue = value.replace(/\D/g, '').slice(0, 4);
+            // Solo números y máximo 3 dígitos
+            formattedValue = value.replace(/\D/g, '').slice(0, 3);
         }
 
+        // Actualizamos el estado y limpiamos error si existe
         setCardData(prev => ({...prev, [field]: formattedValue}));
         if (errors[field]) setErrors((prev: any) => ({...prev, [field]: ''}));
     };
@@ -106,13 +127,12 @@ export default function PaymentGateway() {
 
             setStep('success');
             localStorage.setItem('paymentSuccess', 'true');
-            // NO establecemos isProcessing a false aquí para evitar doble click accidental en la pantalla de éxito
 
         } catch (error: any) {
             console.error(error);
             setStep('error');
             toast.error(error.message);
-            setIsProcessing(false); // Solo desbloqueamos si falla
+            setIsProcessing(false);
         }
     };
 
@@ -133,9 +153,9 @@ export default function PaymentGateway() {
     };
 
     const handleSubmit = () => {
-        if (isProcessing) return; // BLOQUEO DOBLE CLICK
+        if (isProcessing) return;
         if (validateCard()) {
-            setIsProcessing(true); // BLOQUEO INMEDIATO
+            setIsProcessing(true);
             simulatePayment();
         } else {
             toast.error("Por favor, revisa los datos de la tarjeta");
