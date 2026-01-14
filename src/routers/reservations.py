@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from src.db.session import get_db
+from typing import List
 from src.core.deps import get_current_user
 from src.models.user_model import User
 from src.models.reservation_model import Reservation
