@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom'; // <--- Importante: useNavigate
 import { Calendar, User, Settings, LogOut, Home, Bell, Search, Plus, X, Loader2 } from 'lucide-react';
 
 interface Reservation {
@@ -23,12 +23,12 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('home');
   const [showReserveModal, setShowReserveModal] = useState(false);
 
-  // --- Estados de datos ---
+  // Estados de datos
   const [user, setUser] = useState<UserProfile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- Formulario de reserva ---
+  // Formulario de reserva
   const [newResFacility, setNewResFacility] = useState('Pádel Court 1');
   const [newResDate, setNewResDate] = useState('');
   const [newResTime, setNewResTime] = useState('09:00');
@@ -37,6 +37,8 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
+
+      // Si no hay token, redirigir inmediatamente
       if (!token) {
         navigate('/login');
         return;
@@ -54,7 +56,8 @@ export default function Dashboard() {
           const userData = await userResponse.json();
           setUser(userData);
         } else if (userResponse.status === 401) {
-            handleLogout(); // Token expirado
+            handleLogout(); // Token expirado o inválido
+            return;
         }
 
         // Obtener reservas existentes
@@ -80,7 +83,7 @@ export default function Dashboard() {
     navigate('/login');
   };
 
-  // Redireccion de pago
+  // Logica de redirecccion de pago
   const handleCreateReservation = () => {
     if (!newResDate || !newResTime) {
       alert("Por favor selecciona fecha y hora");
@@ -106,6 +109,7 @@ export default function Dashboard() {
     const tax = price * 0.21;
     const total = price + tax;
 
+    // Cerrar modal y redirigir pago
     setShowReserveModal(false);
 
     navigate('/payment', {
