@@ -1,13 +1,14 @@
+from _ast import List
 from datetime import datetime, timedelta, timezone
 import random
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from src.db.session import get_db
 from src.models.user_model import User
-from src.schemas.user_schema import UserCreate, UserResponse
+from src.schemas.user_schema import UserCreate, UserResponse, UserUpdate
 from src.services.email import send_verification_email
 from src.core.security import get_password_hash
-from src.core.deps import get_current_user
+from src.core.deps import get_current_user, get_current_admin
 
 router = APIRouter()
 
@@ -58,3 +59,32 @@ def read_users_me(current_user: User = Depends(get_current_user)):
     Obtener el perfil del usuario logueado.
     """
     return current_user
+
+
+@router.put("/me", response_model=UserResponse)
+def update_user_me(
+        user_update: UserUpdate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Actualizar datos del perfil (para completar registro social)"""
+    if user_update.phone:
+        current_user.phone = user_update.phone
+    if user_update.address:
+        current_user.address = user_update.address
+    if user_update.apartment:
+        current_user.apartment = user_update.apartment.upper()  # Guardar letra en mayúscula
+    if user_update.postal_code:
+        current_user.postal_code = user_update.postal_code
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.get("/", response_model=List[UserResponse])
+def read_users(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    return db.query(User).all()

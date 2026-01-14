@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 import re
 
-# Reglas de validación
+# --- Reglas de validación (Regex) ---
 PHONE_REGEX = r'^\+?[0-9]{9,15}$'
 PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{8,}$'
 
@@ -15,14 +15,15 @@ class UserBase(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     postal_code: Optional[str] = None
-
     is_active: bool = True
+    role: Optional[str] = "user"
 
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             return v
+        # Eliminar espacios y guiones para validar
         clean_phone = re.sub(r'[\s-]', '', v)
         if not re.match(PHONE_REGEX, clean_phone):
             raise ValueError('El teléfono debe tener entre 9 y 15 dígitos.')
@@ -43,14 +44,7 @@ class UserCreate(UserBase):
         return v
 
 
-class UserResponse(UserBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
+# Esquema para actualizar perfil
 class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=3)
     apartment: Optional[str] = Field(None, min_length=1)
@@ -67,3 +61,12 @@ class UserUpdate(BaseModel):
         if not re.match(PHONE_REGEX, clean_phone):
             raise ValueError('El teléfono debe tener entre 9 y 15 dígitos.')
         return clean_phone
+
+
+class UserResponse(UserBase):
+    id: int
+    created_at: datetime
+
+
+    class Config:
+        from_attributes = True

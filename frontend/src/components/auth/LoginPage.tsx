@@ -12,36 +12,53 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Lógica de Autenticación social back ---
-    const authenticateWithBackendSocial = async (firebaseToken: string) => {
+    const handleSuccessfulLogin = async (token: string) => {
+        // Guardar token
+        localStorage.setItem('token', token);
+
         try {
-            // Enviamos el token de Firebase a TU backend Python
-            const response = await fetch('http://localhost:8000/api/v1/auth/login/social', {
-                method: 'POST',
+            // Consultar perfil para saber el ROL
+            const response = await fetch('http://localhost:8000/api/v1/users/me', {
                 headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ token: firebaseToken }),
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
-            const data = await response.json();
+            if (!response.ok) throw new Error("Error obteniendo perfil");
 
-            if (!response.ok) {
-                throw new Error(data.detail || 'Error al validar con el servidor');
+            const userData = await response.json();
+
+            // Redirigir según rol
+            if (userData.role === 'admin') {
+                navigate('/admin');
+                toast.success(`Bienvenido Admin, ${userData.full_name}`);
+            } else {
+                navigate('/dashboard');
+                toast.success(`¡Hola de nuevo, ${userData.full_name}!`);
             }
 
-            // Guardamos el token de sesión de TU sistema (JWT)
-            localStorage.setItem('token', data.access_token);
-            return true;
-        } catch (error: any) {
-            console.error("Error backend social:", error);
-            throw error;
+        } catch (error) {
+            console.error("Error redirect:", error);
+            // Si falla obtener el perfil, por seguridad mandamos al dashboard normal
+            navigate('/dashboard');
         }
     };
 
-    // Manejador de botones
+    // Autenticación social
+    const authenticateWithBackendSocial = async (firebaseToken: string) => {
+        const response = await fetch('http://localhost:8000/api/v1/auth/login/social', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: firebaseToken }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Error al validar con el servidor');
+
+        return data.access_token;
+    };
+
     const handleSocialLogin = async (provider: any) => {
-        // Validación por si Facebook no está configurado aún en Firebase.ts
         if (!provider) {
             toast("Próximamente disponible", { icon: '🚧' });
             return;
@@ -51,33 +68,30 @@ export default function LoginPage() {
         const loadingToast = toast.loading('Conectando con proveedor...');
 
         try {
-            // Paso A: Login en Firebase
+            // Firebase Login
             const result = await signInWithPopup(auth, provider);
-            const token = await result.user.getIdToken();
+            const fbToken = await result.user.getIdToken();
 
-            // Paso B: Login en tu Backend
+            // Backend Login
             toast.loading('Verificando cuenta...', { id: loadingToast });
-            await authenticateWithBackendSocial(token);
+            const backendToken = await authenticateWithBackendSocial(fbToken);
 
-            // Paso C: Éxito
-            toast.success("¡Bienvenido de nuevo!", { id: loadingToast });
-            navigate('/dashboard');
+            // Redirección inteligente
+            toast.dismiss(loadingToast);
+            await handleSuccessfulLogin(backendToken);
 
         } catch (error: any) {
             console.error(error);
             let msg = "Error al iniciar sesión";
-
             if (error.code === 'auth/popup-closed-by-user') msg = "Has cancelado el inicio de sesión";
-            else if (error.code === 'auth/account-exists-with-different-credential') msg = "El correo ya está registrado con otro método.";
             else if (error.message) msg = error.message;
-
             toast.error(msg, { id: loadingToast });
         } finally {
             setIsLoading(false);
         }
     };
 
-    // --- 3. Login Normal (Email/Contraseña) ---
+    //  Login basico (Email/Pass)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -90,24 +104,15 @@ export default function LoginPage() {
 
             const response = await fetch('http://localhost:8000/api/v1/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData,
             });
 
             const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'Credenciales incorrectas');
 
-            if (!response.ok) {
-                throw new Error(data.detail || 'Credenciales incorrectas');
-            }
-
-            // Guardamos el token
-            localStorage.setItem('token', data.access_token);
-
-            // Éxito y redirección
-            toast.success('¡Bienvenido de vuelta!', { id: loadingToast });
-            navigate('/dashboard');
+            toast.dismiss(loadingToast);
+            await handleSuccessfulLogin(data.access_token);
 
         } catch (error: any) {
             console.error("Error login:", error);
