@@ -1,50 +1,44 @@
-import { useEffect, useState, useRef } from 'react';
-import { ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom'; // Importamos useNavigate para la navegación
+import {useEffect, useState, useRef} from 'react';
+import {ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight} from 'lucide-react';
+import {useNavigate} from 'react-router-dom';
 
 export default function LandingPage() {
     const [scrollY, setScrollY] = useState(0);
     const [showNav, setShowNav] = useState(false);
     const carouselRef = useRef<HTMLDivElement>(null);
-    const navigate = useNavigate(); // Inicializamos useNavigate
+    const navigate = useNavigate();
 
     // --- Lógica para redirección inteligente ---
-    // Si el usuario tiene sesión (token), va al Dashboard. Si no, al Login.
     const handleReserveAction = () => {
         const token = localStorage.getItem('token');
         if (token) {
-            // Si hay token (está logueado) -> Ir al Dashboard
             navigate('/dashboard');
         } else {
-            // Si no hay token (no logueado) -> Ir al Login
             navigate('/login');
         }
     };
-    // -----------------------------------------
 
-    // Mantiene la lógica de detección de scroll para las animaciones
+    // Scroll Detection
     useEffect(() => {
         let ticking = false;
         const handleScroll = () => {
             if (!ticking) {
                 window.requestAnimationFrame(() => {
                     setScrollY(window.scrollY);
-                    setShowNav(window.scrollY > 400); // Muestra la barra de navegación tras 400px de scroll
+                    setShowNav(window.scrollY > 400);
                     ticking = false;
                 });
                 ticking = true;
             }
         };
-        window.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('scroll', handleScroll, {passive: true});
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Función para navegación suave ("smooth scroll") a las secciones de la página
     const scrollToSection = (id: string) => {
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById(id)?.scrollIntoView({behavior: 'smooth'});
     };
 
-    // Lógica del carrusel de servicios (desplazamiento horizontal)
     const scrollCarousel = (direction: 'left' | 'right') => {
         if (carouselRef.current) {
             carouselRef.current.scrollBy({
@@ -54,6 +48,7 @@ export default function LandingPage() {
         }
     };
 
+    // --- SERVICIOS (Sin Zona Infantil) ---
     const services = [
         {
             id: 1,
@@ -94,14 +89,6 @@ export default function LandingPage() {
             image: '/images/comunidad_4.jpg',
             specs: ['Capacidad 50p', 'A/V System', 'Catering'],
             price: 'Bajo reserva'
-        },
-        {
-            id: 6,
-            title: 'Zona Infantil',
-            subtitle: 'Kids Area',
-            image: '/images/zona_infantil.jpg',
-            specs: ['Supervisión', 'Juegos seguros', 'Aire libre'],
-            price: 'Acceso libre'
         }
     ];
 
@@ -127,7 +114,6 @@ export default function LandingPage() {
                                     className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Beneficios
                             </button>
                         </div>
-                        {/* Botón Acceder: Usa la redirección inteligente */}
                         <button onClick={handleReserveAction}
                                 className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-200 transition cursor-pointer border-none">
                             <Lock size={16}/>Acceder
@@ -156,7 +142,6 @@ export default function LandingPage() {
                             reservas de instalaciones deportivas<br className="hidden md:block"/> con la experiencia que
                             mereces.</p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            {/* Botón Comenzar ahora: Usa la redirección inteligente */}
                             <button onClick={handleReserveAction}
                                     className="bg-white text-black px-8 py-4 rounded-full text-lg font-medium hover:bg-gray-200 transition shadow-2xl cursor-pointer border-none">Comenzar
                                 ahora
@@ -184,13 +169,14 @@ export default function LandingPage() {
                     </div>
                     <div className="flex justify-end gap-3 mb-6">
                         <button onClick={() => scrollCarousel('left')}
-                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"><ChevronLeft size={24}/>
-                        </button>
+                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white">
+                            <ChevronLeft size={24}/></button>
                         <button onClick={() => scrollCarousel('right')}
-                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"><ChevronRight
-                            size={24}/></button>
+                                className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white">
+                            <ChevronRight size={24}/></button>
                     </div>
-                    <div ref={carouselRef} className="carousel-container flex gap-6 pb-6 overflow-x-auto scrollbar-hide">
+                    <div ref={carouselRef}
+                         className="carousel-container flex gap-6 pb-6 overflow-x-auto scrollbar-hide">
                         {services.map((s) => (
                             <div key={s.id}
                                  className="service-card glass rounded-2xl overflow-hidden min-w-[350px] md:min-w-[400px] flex-shrink-0 border border-white/10">
@@ -208,14 +194,13 @@ export default function LandingPage() {
                                     <div className="space-y-2 mb-4">{s.specs.map((sp, i) => (
                                         <div key={i} className="flex items-center gap-2 text-sm text-gray-400">
                                             <div className="w-1 h-1 bg-white/50 rounded-full"></div>
-                                            {sp}</div>))}</div>
+                                            {sp}</div>
+                                    ))}</div>
                                     <div className="flex justify-between items-center pt-4 border-t border-white/10">
                                         <span className="text-sm font-medium text-gray-400">{s.price}</span>
-                                        {/* Botón Reservar: Usa la redirección inteligente */}
-                                        <button
-                                            onClick={handleReserveAction}
-                                            className="text-sm font-medium hover:text-gray-300 transition cursor-pointer bg-transparent border-none text-white">
-                                            Reservar →
+                                        <button onClick={handleReserveAction}
+                                                className="text-sm font-medium hover:text-gray-300 transition cursor-pointer bg-transparent border-none text-white">Reservar
+                                            →
                                         </button>
                                     </div>
                                 </div>
@@ -227,7 +212,6 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* SECCIONES INTERMEDIAS (Visuales - Sin cambios lógicos) */}
             <section id="facilities" className="relative h-[200vh]">
                 <div className="sticky top-0 h-screen flex items-center justify-center px-6">
                     <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
@@ -353,6 +337,25 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/*  Seccion de envio */}
+            <section className="py-24 px-6 bg-gradient-to-b from-black to-gray-950">
+                <div className="max-w-5xl mx-auto text-center">
+                    <h2 className="text-4xl md:text-6xl font-light mb-12">¿Cómo hago la reserva?</h2>
+
+                    {/* Contenedor del Vídeo con Efecto Glass */}
+                    <div
+                        className="relative aspect-video w-full rounded-3xl overflow-hidden glass border border-white/10 shadow-2xl group">
+                        <video className="w-full h-full relative z-20" controls>
+                            <source src="/videos/video.mp4" type="video/mp4"/>
+                            Tu navegador no soporta el elemento de video.
+                        </video>
+                    </div>
+
+                    <p className="mt-8 text-gray-400 font-light text-lg">Descubre lo sencillo que es empezar a disfrutar
+                        de tus instalaciones.</p>
+                </div>
+            </section>
+
             <section id="features" className="py-32 px-6 bg-black">
                 <div className="max-w-7xl mx-auto">
                     <h2 className="text-5xl md:text-7xl font-light text-center mb-20 leading-tight">Diseñado
@@ -411,7 +414,6 @@ export default function LandingPage() {
                         className="font-semibold">comienza aquí.</span></h2>
                     <p className="text-xl text-gray-400 mb-12 leading-relaxed font-light max-w-2xl mx-auto">Únete a una
                         comunidad que valora su tiempo y disfruta de instalaciones de primera clase.</p>
-                    {/* Botón Acceder al sistema: Usa la redirección inteligente */}
                     <button onClick={handleReserveAction}
                             className="bg-white text-black px-12 py-5 rounded-full text-xl font-medium hover:bg-gray-200 transition shadow-2xl inline-flex items-center gap-3 cursor-pointer border-none">
                         <Lock size={24}/>Acceder al sistema
@@ -420,9 +422,9 @@ export default function LandingPage() {
             </section>
 
             <footer className="border-t border-white/10 py-12 px-6 bg-black">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4"><p
-                    className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
-                    reservados.</p>
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <p className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
+                        reservados.</p>
                     <div className="flex gap-6 text-sm text-gray-500 font-light">
                         <button onClick={() => window.location.href = '/privacy'}
                                 className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Privacidad

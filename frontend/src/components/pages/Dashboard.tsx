@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, User, Settings, LogOut, Home, Bell, Search, Plus,
-  X, Loader2, Save, MapPin, AlertCircle, Camera, Trash2, Sun, Moon, Globe
+  X, Loader2, Save, MapPin, AlertCircle, Camera, Trash2, Sun, Moon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -58,7 +58,6 @@ export default function Dashboard() {
 
   // --- Estados de Configuración ---
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [language, setLanguage] = useState('es');
 
   // Referencias
   const toastShownRef = useRef(false);
@@ -685,25 +684,6 @@ export default function Dashboard() {
                         >
                             <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${isDarkMode ? 'left-7' : 'left-1'}`}></div>
                         </button>
-                    </div>
-
-                    {/* Idioma */}
-                    <div className={`flex items-center justify-between p-4 rounded-xl transition ${isDarkMode ? 'bg-white/5' : 'bg-white border border-gray-100 shadow-sm'}`}>
-                        <div className="flex items-center gap-3">
-                            <Globe size={20} className="text-blue-400" />
-                            <div>
-                                <p className="font-medium">Idioma</p>
-                                <p className="text-sm opacity-60">Selecciona tu preferencia</p>
-                            </div>
-                        </div>
-                        <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value)}
-                            className={`bg-transparent border rounded-lg px-2 py-1 outline-none cursor-pointer ${isDarkMode ? 'border-gray-600 text-white' : 'border-gray-300 text-black'}`}
-                        >
-                            <option value="es" className="text-black">Español</option>
-                            <option value="en" className="text-black">English</option>
-                        </select>
                     </div>
 
                     {/* Zona Peligro */}
