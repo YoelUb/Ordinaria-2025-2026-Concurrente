@@ -1,4 +1,4 @@
-"""Crear tabla reservas
+"""Crear tabla reservas y facilities
 
 Revision ID: 22cb26324bb5
 Revises: 6b2c6a281dd3
@@ -18,9 +18,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # ELIMINADO: No creamos la extensión btree_gist ni la constraint de exclusión
-    # porque ahora gestionamos la capacidad (aforo) desde el código Python (routers/reservations.py)
+    # Necesaria para guardar precios, aforo, iconos y colores de forma dinámica
+    op.create_table('facilities',
+                    sa.Column('id', sa.Integer(), nullable=False),
+                    sa.Column('name', sa.String(), nullable=False),
+                    sa.Column('price', sa.Float(), server_default='0.0', nullable=False),
+                    sa.Column('capacity', sa.Integer(), server_default='1', nullable=False),
+                    sa.Column('icon', sa.String(), nullable=True),
+                    sa.Column('color', sa.String(), nullable=True),
+                    sa.Column('description', sa.String(), nullable=True),
+                    sa.PrimaryKeyConstraint('id')
+                    )
+    # Índices para facilities
+    op.create_index(op.f('ix_facilities_id'), 'facilities', ['id'], unique=False)
+    op.create_index(op.f('ix_facilities_name'), 'facilities', ['name'], unique=True)
 
+    # --- 2. CREAR TABLA RESERVATIONS ---
     op.create_table('reservations',
                     sa.Column('id', sa.Integer(), nullable=False),
                     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -28,10 +41,10 @@ def upgrade() -> None:
                     sa.Column('start_time', sa.DateTime(timezone=True), nullable=False),
                     sa.Column('end_time', sa.DateTime(timezone=True), nullable=False),
                     sa.Column('status', sa.String(), server_default='confirmed', nullable=False),
-                    # CAMBIO: price nullable=False y default 0.0 para consistencia
                     sa.Column('price', sa.Float(), server_default='0.0', nullable=False),
                     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
-                    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+                    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+                    # Cascade para borrar reservas si se borra el usuario
                     sa.PrimaryKeyConstraint('id')
                     )
 
@@ -39,8 +52,12 @@ def upgrade() -> None:
     op.create_index(op.f('ix_reservations_id'), 'reservations', ['id'], unique=False)
 
 
-
 def downgrade() -> None:
+    # Orden inverso para borrar
     op.drop_index(op.f('ix_reservations_id'), table_name='reservations')
     op.drop_index(op.f('ix_reservations_facility'), table_name='reservations')
     op.drop_table('reservations')
+
+    op.drop_index(op.f('ix_facilities_name'), table_name='facilities')
+    op.drop_index(op.f('ix_facilities_id'), table_name='facilities')
+    op.drop_table('facilities')

@@ -19,7 +19,7 @@ interface Reservation {
   start_time: string;
   end_time: string;
   status?: string;
-  price?: number;
+  price: number; // Precio histórico guardado en BD
 }
 
 interface UserProfile {
@@ -50,13 +50,14 @@ type PhotonFeature = {
   };
 };
 
+// Interfaz para la configuración dinámica de instalaciones
 interface FacilityInfo {
+  id: number;
   name: string;
   price: number;
   capacity: number;
-  currentReservations: number;
-  icon: string;
-  color: string;
+  icon?: string;
+  color?: string;
 }
 
 interface AvailabilitySlot {
@@ -123,6 +124,15 @@ const timeToMinutes = (timeStr: string): number => {
   return hours * 60 + minutes;
 };
 
+// Mapeo estático de iconos y colores (ya que la BD solo guarda nombre/precio/capacidad)
+const FACILITY_ASSETS: {[key: string]: {icon: string, color: string}} = {
+    'Pádel Court 1': { icon: '🎾', color: 'from-blue-500 to-cyan-500' },
+    'Pádel Court 2': { icon: '🎾', color: 'from-blue-500 to-cyan-500' },
+    'Piscina':       { icon: '🏊', color: 'from-cyan-500 to-teal-500' },
+    'Gimnasio':      { icon: '💪', color: 'from-purple-500 to-pink-500' },
+    'Sauna':         { icon: '🔥', color: 'from-orange-500 to-red-500' }
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('home');
@@ -136,11 +146,13 @@ export default function Dashboard() {
 
   // Referencias
   const toastShownRef = useRef(false);
-  const notificationProcessedRef = useRef({ payment: false, cancel: false });
   const wrapperRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Referencia para guardar los precios anteriores y detectar cambios
+  const previousPricesRef = useRef<{[key: string]: number}>({});
 
   // Estados UI
   const [showReserveModal, setShowReserveModal] = useState(false);
@@ -149,11 +161,13 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState<number | null>(null);
-  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
 
   // Estados Datos
   const [user, setUser] = useState<UserProfile | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+
+  // Configuración DINÁMICA de instalaciones (se carga del backend)
+  const [facilitiesConfig, setFacilitiesConfig] = useState<{ [key: string]: FacilityInfo }>({});
 
   // Notificaciones persistentes
   const [notifications, setNotifications] = useState<Notification[]>(() => {
@@ -173,10 +187,9 @@ export default function Dashboard() {
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deletingReservation, setDeletingReservation] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Reserva
-  const [newResFacility, setNewResFacility] = useState('Pádel Court 1');
+  const [newResFacility, setNewResFacility] = useState(''); // Se inicializa al cargar configs
   const [newResDate, setNewResDate] = useState(() => {
     const today = new Date();
     const year = today.getFullYear();
@@ -189,15 +202,6 @@ export default function Dashboard() {
   // Almacena disponibilidad por slot {hora: {count, capacity}}
   const [slotAvailability, setSlotAvailability] = useState<{ [key: string]: AvailabilitySlot }>({});
   const [loadingSlots, setLoadingSlots] = useState(false);
-
-  // Configuración estática de instalaciones (debe coincidir con backend)
-  const [facilitiesConfig] = useState<{ [key: string]: FacilityInfo }>({
-    'Pádel court 1': { name: 'Pádel Court 1', price: 15.00, capacity: 1, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
-    'Pádel court 2': { name: 'Pádel Court 2', price: 15.00, capacity: 1, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
-    'Piscina': { name: 'Piscina', price: 8.00, capacity: 20, currentReservations: 0, icon: '🏊', color: 'from-cyan-500 to-teal-500' },
-    'Gimnasio': { name: 'Gimnasio', price: 5.00, capacity: 30, currentReservations: 0, icon: '💪', color: 'from-purple-500 to-pink-500' },
-    'Sauna': { name: 'Sauna', price: 10.00, capacity: 10, currentReservations: 0, icon: '🔥', color: 'from-orange-500 to-red-500' }
-  });
 
   // Perfil
   const [profileForm, setProfileForm] = useState({ phone: '', address: '', apartment: '', postal_code: '' });
@@ -221,7 +225,23 @@ export default function Dashboard() {
     localStorage.setItem('notifications', JSON.stringify(notifications));
   }, [notifications]);
 
-  // Función para cargar datos del usuario y reservas
+  // Función para transformar datos de instalaciones
+  const transformFacilityData = (facilitiesData: any[]) => {
+    const configMap: { [key: string]: FacilityInfo } = {};
+
+    facilitiesData.forEach((fac: any) => {
+      // Combinar datos del backend con assets estáticos (iconos/colores)
+      const assets = FACILITY_ASSETS[fac.name] || { icon: '📍', color: 'from-gray-500 to-gray-600' };
+      configMap[fac.name] = {
+        ...fac,
+        ...assets
+      };
+    });
+
+    return configMap;
+  };
+
+  // --- 1. CARGAR DATOS (Usuario, Reservas e INSTALACIONES) ---
   const fetchData = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -232,7 +252,7 @@ export default function Dashboard() {
     try {
       const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
 
-      // Cargar usuario
+      // A. Cargar usuario
       const userResponse = await fetch('http://localhost:8000/api/v1/users/me', { headers });
       if (userResponse.status === 401) {
         handleLogout();
@@ -262,11 +282,20 @@ export default function Dashboard() {
         }
       }
 
-      // Cargar reservas del usuario
+      // B. Cargar reservas del usuario
       const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', { headers });
       if (resResponse.ok) {
         const resData = await resResponse.json();
-        const sortedRes = resData.sort((a: Reservation, b: Reservation) =>
+        // Asegurar que cada reserva tenga un precio (si no viene del backend, usar precio de la instalación)
+        const processedReservations = resData.map((res: any) => {
+          // Si la reserva no tiene precio, buscar el precio actual de la instalación
+          if (!res.price && facilitiesConfig[res.facility]) {
+            return { ...res, price: facilitiesConfig[res.facility].price };
+          }
+          return res;
+        });
+
+        const sortedRes = processedReservations.sort((a: Reservation, b: Reservation) =>
           new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
         );
         setReservations(sortedRes);
@@ -277,29 +306,108 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [navigate, showCompleteProfile]);
+  }, [navigate, showCompleteProfile, facilitiesConfig]);
 
-  // --- 1. Cargar Datos y Polling ---
+  // --- Función para cargar PRECIOS específicamente ---
+  const fetchPrices = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+      const facilitiesResponse = await fetch('http://localhost:8000/api/v1/reservations/facilities', { headers });
+
+      if (facilitiesResponse.ok) {
+        const facilitiesData = await facilitiesResponse.json();
+        const configMap = transformFacilityData(facilitiesData);
+
+        // Detectar cambios en los precios
+        const priceChanges: {[key: string]: {old: number, new: number}} = {};
+        Object.keys(configMap).forEach(facilityName => {
+          const oldPrice = previousPricesRef.current[facilityName];
+          const newPrice = configMap[facilityName].price;
+
+          if (oldPrice !== undefined && oldPrice !== newPrice) {
+            priceChanges[facilityName] = { old: oldPrice, new: newPrice };
+          }
+
+          // Actualizar referencia
+          previousPricesRef.current[facilityName] = newPrice;
+        });
+
+        // Actualizar estado
+        setFacilitiesConfig(configMap);
+
+        // Mostrar notificación si hay cambios de precio
+        if (Object.keys(priceChanges).length > 0) {
+          Object.entries(priceChanges).forEach(([facility, prices]) => {
+            if (prices.old < prices.new) {
+              // Precio aumentó
+              toast(`🔼 ${facility}: ${prices.old}€ → ${prices.new}€`, {
+                duration: 3000,
+                icon: '📈',
+                style: {
+                  background: isDarkMode ? '#1f2937' : '#f3f4f6',
+                  color: isDarkMode ? '#fff' : '#111827',
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #d1d5db'
+                }
+              });
+            } else if (prices.old > prices.new) {
+              // Precio bajó
+              toast(`🔽 ${facility}: ${prices.old}€ → ${prices.new}€`, {
+                duration: 3000,
+                icon: '📉',
+                style: {
+                  background: isDarkMode ? '#1f2937' : '#f3f4f6',
+                  color: isDarkMode ? '#fff' : '#111827',
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #d1d5db'
+                }
+              });
+            }
+          });
+        }
+
+        // Si no hay instalación seleccionada, seleccionar la primera
+        if (!newResFacility && facilitiesData.length > 0) {
+          setNewResFacility(facilitiesData[0].name);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching prices", error);
+    }
+  }, [isDarkMode, newResFacility]);
+
+  // --- Polling automático para DATOS GENERALES (cada 4s) ---
   useEffect(() => {
     fetchData();
-
     const intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') {
         fetchData();
       }
-    }, 30000);
-
+    }, 4000); // Cambiado de 30s a 4s
     return () => clearInterval(intervalId);
   }, [fetchData]);
 
-  // --- 2. Notificaciones de Pago y Cancelación ---
+  // --- Polling automático para PRECIOS (cada 4s) ---
+  useEffect(() => {
+    // Cargar precios inicialmente
+    fetchPrices();
+
+    // Configurar intervalo de 4 segundos
+    const priceIntervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchPrices();
+      }
+    }, 4000);
+
+    return () => clearInterval(priceIntervalId);
+  }, [fetchPrices]);
+
+  // --- 2. Notificaciones de Pago ---
   useEffect(() => {
     const paymentSuccess = localStorage.getItem('paymentSuccess');
-    const reservationCancelled = localStorage.getItem('reservationCancelled');
 
-    if (paymentSuccess && !notificationProcessedRef.current.payment) {
-      notificationProcessedRef.current.payment = true;
-
+    if (paymentSuccess) {
       const newNotif = {
         id: Date.now(),
         text: "¡Reserva confirmada exitosamente!",
@@ -314,31 +422,13 @@ export default function Dashboard() {
 
       // Recargar datos después de reserva exitosa
       fetchData();
-    }
-
-    if (reservationCancelled && !notificationProcessedRef.current.cancel) {
-      notificationProcessedRef.current.cancel = true;
-
-      const newNotif = {
-        id: Date.now(),
-        text: "Reserva cancelada correctamente",
-        read: false,
-        time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-      };
-
-      setNotifications(prev => [newNotif, ...prev]);
-      localStorage.removeItem('reservationCancelled');
-      setShowNotifications(true);
-      setTimeout(() => setShowNotifications(false), 4000);
-
-      // Recargar datos después de cancelar
-      fetchData();
+      fetchPrices(); // También actualizar precios
     }
   }, [fetchData]);
 
   // --- 3. Cargar Disponibilidad cuando se abre el modal ---
   useEffect(() => {
-    if (!showReserveModal) {
+    if (!showReserveModal || !newResFacility) {
       setSlotAvailability({});
       setSelectedTimeSlot(null);
       return;
@@ -364,9 +454,12 @@ export default function Dashboard() {
             const minutes = date.getMinutes().toString().padStart(2, '0');
             const timeKey = `${hours}:${minutes}`;
 
+            // Usamos la capacidad dinámica que viene del backend o de la config cargada
+            const currentCapacity = slot.capacity || facilitiesConfig[newResFacility]?.capacity || 1;
+
             availabilityMap[timeKey] = {
               ...slot,
-              capacity: slot.capacity || facilitiesConfig[newResFacility]?.capacity || 1
+              capacity: currentCapacity
             };
           });
 
@@ -386,32 +479,27 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [newResFacility, newResDate, showReserveModal, facilitiesConfig]);
 
-  // --- 4. Función para verificar si el usuario ya tiene reserva en un horario ---
+  // --- 4. Función para verificar si el usuario ya tiene reserva ---
   const userAlreadyHasReservation = useCallback((slotTime: string): boolean => {
     if (!reservations.length) return false;
 
     const selectedDate = new Date(newResDate);
     const selectedTime = timeToMinutes(slotTime);
 
-    // Verificar si el usuario ya tiene una reserva en la misma instalación y fecha
     return reservations.some(reservation => {
       const resDate = new Date(reservation.start_time);
       const resTime = timeToMinutes(
         `${String(resDate.getHours()).padStart(2, '0')}:${String(resDate.getMinutes()).padStart(2, '0')}`
       );
 
-      // Misma fecha (solo día, mes y año)
       const sameDate =
         resDate.getFullYear() === selectedDate.getFullYear() &&
         resDate.getMonth() === selectedDate.getMonth() &&
         resDate.getDate() === selectedDate.getDate();
 
-      // Misma instalación
       const sameFacility = reservation.facility === newResFacility;
-
-      // Mismo horario (con margen de ±90 minutos para evitar solapamientos)
       const timeDifference = Math.abs(resTime - selectedTime);
-      const sameTimeSlot = timeDifference < 90; // Menos de 1.5 horas de diferencia
+      const sameTimeSlot = timeDifference < 90;
 
       return sameDate && sameFacility && sameTimeSlot;
     });
@@ -437,7 +525,6 @@ export default function Dashboard() {
     return () => clearTimeout(timeoutId);
   }, [profileForm.address, showAddressMenu]);
 
-  // --- 6. Manejar clicks fuera de elementos ---
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -452,7 +539,7 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- 7. Calcular gastos mensuales ---
+  // --- 6. Calcular gastos mensuales (VERSIÓN CORREGIDA) ---
   useEffect(() => {
     if (reservations.length === 0) {
       setMonthlyExpenses([]);
@@ -461,15 +548,16 @@ export default function Dashboard() {
 
     setExpensesLoading(true);
     try {
-      // Agrupar reservas por mes/año
       const expensesByMonth: { [key: string]: MonthlyExpense } = {};
 
       reservations.forEach(reservation => {
+        // Usamos el precio HISTÓRICO guardado en la reserva
+        // Si no tiene precio, no lo incluimos en los gastos
         if (reservation.price && reservation.price > 0) {
           const date = new Date(reservation.start_time);
           const month = date.toLocaleDateString('es-ES', { month: 'long' });
           const year = date.getFullYear();
-          const key = `${year}-${date.getMonth()}`;
+          const key = `${year}-${date.getMonth() + 1}`; // Añadimos +1 porque getMonth() es 0-indexed
 
           if (!expensesByMonth[key]) {
             expensesByMonth[key] = {
@@ -484,7 +572,6 @@ export default function Dashboard() {
           expensesByMonth[key].total += reservation.price;
           expensesByMonth[key].reservations.push(reservation);
 
-          // Acumular por instalación
           if (!expensesByMonth[key].facilityBreakdown[reservation.facility]) {
             expensesByMonth[key].facilityBreakdown[reservation.facility] = 0;
           }
@@ -492,16 +579,15 @@ export default function Dashboard() {
         }
       });
 
-      // Convertir a array y ordenar
       const expensesArray = Object.values(expensesByMonth)
         .sort((a, b) => {
           if (a.year !== b.year) return b.year - a.year;
-          // Ordenar por mes (año inverso)
           const monthOrder = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
             'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
           return monthOrder.indexOf(b.month.toLowerCase()) - monthOrder.indexOf(a.month.toLowerCase());
         });
 
+      console.log("Gastos calculados:", expensesArray); // Para depuración
       setMonthlyExpenses(expensesArray);
     } catch (error) {
       console.error("Error calculando gastos mensuales", error);
@@ -546,7 +632,7 @@ export default function Dashboard() {
     setShowAddressMenu(false);
   };
 
-  // --- 8. Avatar (MinIO) ---
+  // --- 7. Avatar (MinIO) ---
   const triggerFileInput = (ref: React.RefObject<HTMLInputElement>) => {
     ref.current?.click();
   };
@@ -591,7 +677,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- 9. BORRAR RESERVA ---
+  // --- 8. BORRAR RESERVA ---
   const handleDeleteReservation = async (reservationId: number) => {
     setDeletingReservation(true);
     const loadingToast = toast.loading("Eliminando reserva...");
@@ -604,17 +690,23 @@ export default function Dashboard() {
       });
 
       if (response.ok) {
-        // Actualizar estado local
         setReservations(prev => prev.filter(res => res.id !== reservationId));
 
-        // Guardar en localStorage para mostrar notificación
-        localStorage.setItem('reservationCancelled', 'true');
+        const newNotif = {
+          id: Date.now(),
+          text: "Reserva cancelada correctamente",
+          read: false,
+          time: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setNotifications(prev => [newNotif, ...prev]);
+        setShowNotifications(true); // Opcional: mostrar notificación visual
+        setTimeout(() => setShowNotifications(false), 4000);
 
         toast.success("Reserva eliminada correctamente", { id: loadingToast });
         setShowDeleteModal(false);
         setReservationToDelete(null);
 
-        // Recargar datos
         fetchData();
       } else {
         const errorData = await response.json();
@@ -627,40 +719,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- 10. BORRAR CUENTA ---
-  const handleDeleteAccount = async () => {
-    setDeletingAccount(true);
-    const loadingToast = toast.loading("Eliminando cuenta...");
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/api/v1/users/me', {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        toast.success("Cuenta eliminada correctamente", { id: loadingToast });
-
-        // Limpiar localStorage
-        localStorage.removeItem('token');
-        localStorage.removeItem('darkMode');
-        localStorage.removeItem('paymentSuccess');
-        localStorage.removeItem('reservationCancelled');
-        localStorage.removeItem('notifications');
-
-        navigate('/login');
-      } else {
-        throw new Error("Error al eliminar cuenta");
-      }
-    } catch (error) {
-      toast.error("No se pudo eliminar la cuenta", { id: loadingToast });
-    } finally {
-      setDeletingAccount(false);
-    }
-  };
-
-  // --- 11. Buscador ---
+  // --- 10. Buscador ---
   const filteredReservations = reservations.filter(res => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -668,14 +727,13 @@ export default function Dashboard() {
     return res.facility.toLowerCase().includes(query) || date.includes(query);
   });
 
-  // --- 12. Funciones para gastos mensuales ---
+  // --- 11. Funciones para gastos mensuales ---
   const getExpenseStats = () => {
     if (monthlyExpenses.length === 0) return null;
 
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().toLocaleDateString('es-ES', { month: 'long' });
 
-    // Filtrar según el filtro seleccionado
     let filteredExpenses = monthlyExpenses;
     if (expenseFilter === 'currentYear') {
       filteredExpenses = monthlyExpenses.filter(exp => exp.year === currentYear);
@@ -691,12 +749,10 @@ export default function Dashboard() {
     const totalSpent = filteredExpenses.reduce((sum, exp) => sum + exp.total, 0);
     const avgMonthly = filteredExpenses.length > 0 ? totalSpent / filteredExpenses.length : 0;
 
-    // Gastos del mes actual
     const currentMonthExpense = monthlyExpenses.find(
       exp => exp.year === currentYear && exp.month.toLowerCase() === currentMonth.toLowerCase()
     );
 
-    // Tendencia (comparar con mes anterior)
     let trend = 0;
     let trendText = "Sin datos previos";
 
@@ -721,7 +777,6 @@ export default function Dashboard() {
     };
   };
 
-  // Función para alternar mes expandido
   const toggleExpandMonth = (monthKey: string) => {
     setExpandedMonths(prev =>
       prev.includes(monthKey)
@@ -730,7 +785,6 @@ export default function Dashboard() {
     );
   };
 
-  // Función para obtener el color según la instalación
   const getFacilityColor = (facility: string) => {
     const colors: { [key: string]: string } = {
       'pádel': 'bg-blue-500',
@@ -824,7 +878,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Verificar si la fecha es pasada
     const selectedDate = new Date(newResDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -834,7 +887,6 @@ export default function Dashboard() {
       return;
     }
 
-    // VERIFICAR SI EL USUARIO YA TIENE RESERVA EN ESE HORARIO
     if (userAlreadyHasReservation(selectedTimeSlot)) {
       toast.error("Ya tienes una reserva en este horario para esta instalación");
       return;
@@ -845,13 +897,13 @@ export default function Dashboard() {
     const endTimeString = endDateTime.toTimeString().slice(0, 5);
     const displayDate = startDateTime.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Obtener precio según la instalación
+    // Obtener precio DINÁMICO de la configuración cargada
     const facilityInfo = facilitiesConfig[newResFacility];
-    const price = facilityInfo ? facilityInfo.price : 15.00;
-    const tax = price * 0.21;
-    const total = price + tax;
+    const priceBase = facilityInfo ? facilityInfo.price : 15.00;
+    const tax = priceBase * 0.21;
+    const total = priceBase + tax;
 
-    // Verificar capacidad usando datos del backend
+    // Verificar capacidad
     const slotInfo = slotAvailability[selectedTimeSlot];
     const currentCapacity = slotInfo?.capacity || facilityInfo?.capacity || 1;
     const currentCount = slotInfo?.count || 0;
@@ -874,7 +926,7 @@ export default function Dashboard() {
           date: displayDate,
           time: `${selectedTimeSlot} - ${endTimeString}`,
           duration: '1h 30m',
-          price,
+          price: priceBase,
           tax,
           total
         }
@@ -1088,11 +1140,40 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+              <div className="glass p-4 md:p-6 rounded-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-10 h-10 md:w-12 md:h-12 bg-green-500/20 rounded-full flex items-center justify-center">
+                    <TrendingUp className="text-green-400" size={20} />
+                  </div>
+                  <div>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Precios actualizados</p>
+                    <p className="text-2xl md:text-3xl font-light">Cada 4s</p>
+                  </div>
+                </div>
+              </div>
+              <div className="glass p-4 md:p-6 rounded-2xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-10 h-10 md:w-12 md:h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
+                    <Bell className="text-purple-400" size={20} />
+                  </div>
+                  <div>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Notificaciones</p>
+                    <p className="text-2xl md:text-3xl font-light">{notifications.filter(n => !n.read).length}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="glass p-4 md:p-8 rounded-2xl">
-              <h2 className={`text-xl md:text-2xl font-light mb-4 md:mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Mis reservas
-                recientes {searchQuery && "(Filtrado)"}</h2>
+              <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h2 className={`text-xl md:text-2xl font-light ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Mis reservas
+                  recientes {searchQuery && "(Filtrado)"}</h2>
+                <span className="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-400">
+                  Precios en tiempo real
+                </span>
+              </div>
               <div className="space-y-3 md:space-y-4">
                 {filteredReservations.length === 0 ? (
                   <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No tienes reservas activas.</p>
@@ -1113,6 +1194,9 @@ export default function Dashboard() {
                               minute: '2-digit'
                             })}
                           </p>
+                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
+                            Pagado: {res.price.toFixed(2)}€
+                          </p>
                         </div>
                       </div>
                       <StatusBadge status={res.status} />
@@ -1122,21 +1206,30 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              {Object.values(facilitiesConfig).map((facility, i) => (
-                <button key={i} onClick={() => {
-                  setNewResFacility(facility.name);
-                  setShowReserveModal(true);
-                }}
-                  className={`glass p-4 md:p-6 rounded-2xl transition group cursor-pointer border-none ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-900'}`}>
-                  <div
-                    className={`w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br ${facility.color} rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-3 md:mb-4 mx-auto group-hover:scale-110 transition text-white`}>
-                    {facility.icon}
-                  </div>
-                  <p className="text-xs md:text-sm font-medium text-center">{facility.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">{facility.price}€ • Capacidad: {facility.capacity} plaza{facility.capacity !== 1 ? 's' : ''}</p>
-                </button>
-              ))}
+            <div className="glass p-4 md:p-6 rounded-2xl">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className={`text-xl md:text-2xl font-light ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Instalaciones Disponibles</h2>
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Precios en vivo</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                {Object.values(facilitiesConfig).map((facility, i) => (
+                  <button key={i} onClick={() => {
+                    setNewResFacility(facility.name);
+                    setShowReserveModal(true);
+                  }}
+                    className={`glass p-4 md:p-6 rounded-2xl transition group cursor-pointer border-none ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-gray-100 text-gray-900'}`}>
+                    <div
+                      className={`w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br ${facility.color} rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-3 md:mb-4 mx-auto group-hover:scale-110 transition text-white`}>
+                      {facility.icon}
+                    </div>
+                    <p className="text-xs md:text-sm font-medium text-center">{facility.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{facility.price}€ • Capacidad: {facility.capacity}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -1169,15 +1262,14 @@ export default function Dashboard() {
                             minute: '2-digit'
                           })}
                       </p>
-                      {res.price && (
-                        <p className={`text-xs mt-1 ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
-                          Precio pagado: {res.price.toFixed(2)}€
-                        </p>
-                      )}
+                      <p className={`text-xs mt-1 ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
+                        Precio pagado: {res.price.toFixed(2)}€
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row items-end md:items-center gap-3 md:gap-4">
                     <StatusBadge status={res.status} />
+                    {/* BOTÓN DE ELIMINAR RESERVA RESTAURADO */}
                     <button
                       onClick={() => {
                         setReservationToDelete(res.id);
@@ -1350,12 +1442,6 @@ export default function Dashboard() {
                 className={`w-full p-4 text-purple-400 hover:bg-purple-500/10 rounded-xl transition text-left border border-purple-500/20 bg-transparent cursor-pointer flex items-center gap-2 ${isDarkMode ? '' : 'hover:bg-purple-50'}`}
               >
                 <BarChart3 size={20} /> Ver mis gastos mensuales
-              </button>
-
-              <button
-                onClick={() => setShowDeleteAccountModal(true)}
-                className={`w-full p-4 text-red-400 hover:bg-red-500/10 rounded-xl transition text-left border border-red-500/20 bg-transparent cursor-pointer flex items-center gap-2 mt-6 ${isDarkMode ? '' : 'hover:bg-red-50'}`}>
-                <AlertCircle size={20} /> Eliminar cuenta
               </button>
             </div>
           </div>
@@ -1568,7 +1654,7 @@ export default function Dashboard() {
                                           </div>
                                           <div className="text-right">
                                             <p className="font-bold text-green-500">
-                                              {reservation.price?.toFixed(2)}€
+                                              {reservation.price.toFixed(2)}€
                                             </p>
                                             <StatusBadge status={reservation.status} />
                                           </div>
@@ -1682,7 +1768,6 @@ export default function Dashboard() {
                       const isSelected = selectedTimeSlot === slot;
                       const userAlreadyBooked = userAlreadyHasReservation(slot);
 
-                      // Colores según ocupación
                       let occupancyColor = isDarkMode ? 'text-green-400' : 'text-green-600';
                       if (isFull) occupancyColor = 'text-red-500';
                       else if (currentCount > 0) occupancyColor = isDarkMode ? 'text-amber-400' : 'text-amber-600';
@@ -1694,23 +1779,21 @@ export default function Dashboard() {
                           disabled={isFull || userAlreadyBooked}
                           onClick={() => setSelectedTimeSlot(slot)}
                           className={`
-                                                        py-3 rounded-xl border transition flex flex-col items-center justify-center gap-1 cursor-pointer text-sm relative overflow-hidden
-                                                        ${isFull || userAlreadyBooked
+                            py-3 rounded-xl border transition flex flex-col items-center justify-center gap-1 cursor-pointer text-sm relative overflow-hidden
+                            ${isFull || userAlreadyBooked
                               ? 'bg-red-500/10 border-red-500/30 opacity-60 cursor-not-allowed'
                               : isSelected
                                 ? (isDarkMode ? 'bg-white text-black border-white' : 'bg-gray-900 text-white border-gray-900')
                                 : (isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white' : 'bg-white border-gray-200 hover:bg-gray-100 text-gray-900')
                             }
-                                                    `}
+                          `}
                         >
                           <span className="font-medium">{slot}</span>
 
-                          {/* Indicador de ocupación */}
                           <span className={`text-[10px] font-semibold ${isSelected ? (isDarkMode ? 'text-gray-600' : 'text-gray-300') : occupancyColor}`}>
                             {userAlreadyBooked ? 'YA RESERVADO' : (isFull ? 'COMPLETO' : `${available} disponible${available !== 1 ? 's' : ''}`)}
                           </span>
 
-                          {/* Detalle numérico (1/1) */}
                           <span className={`text-[9px] ${isSelected ? 'opacity-80' : 'opacity-50'}`}>
                             ({currentCount}/{currentCapacity})
                           </span>
@@ -1882,44 +1965,6 @@ export default function Dashboard() {
               >
                 {deletingReservation ?
                   <Loader2 className="animate-spin" size={16} /> : 'Eliminar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CONFIRMAR BORRAR CUENTA */}
-      {showDeleteAccountModal && (
-        <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[70] p-4 md:p-6">
-          <div
-            className={`glass p-6 md:p-8 rounded-2xl max-w-md w-full border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.15)] ${isDarkMode ? '' : 'bg-white'}`}>
-            <div className="text-center mb-6">
-              <div
-                className="w-16 h-16 md:w-20 md:h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-red-500/50">
-                <AlertCircle size={32} className="text-red-400" />
-              </div>
-              <h2 className="text-xl md:text-2xl font-bold mb-3 text-red-400">¡Atención!</h2>
-              <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Estás a punto de eliminar tu cuenta
-                permanentemente.</p>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Se perderán todos tus datos y reservas.
-                Esta acción es irreversible.</p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => setShowDeleteAccountModal(false)}
-                className={`w-full py-2 md:py-3 rounded-lg transition cursor-pointer border-none ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deletingAccount}
-                className="w-full py-2 md:py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition cursor-pointer border-none disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {deletingAccount ? <><Loader2 className="animate-spin"
-                  size={16} /> Eliminando...</> : 'Sí, eliminar mi cuenta'}
               </button>
             </div>
           </div>

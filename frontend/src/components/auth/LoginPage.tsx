@@ -3,7 +3,7 @@ import { Lock, Mail, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithPopup } from "firebase/auth";
 import toast from "react-hot-toast";
-import { auth, googleProvider, githubProvider, facebookProvider } from "../../config/Firebase";
+import { auth, googleProvider, githubProvider } from "../../config/Firebase";
 
 export default function LoginPage() {
     const navigate = useNavigate();
@@ -13,39 +13,47 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
 
     const handleSuccessfulLogin = async (token: string) => {
-        // Guardar token
+        console.log("1. Token recibido en handleSuccessfulLogin:", token.substring(0, 10) + "...");
         localStorage.setItem('token', token);
 
         try {
-            // Consultar perfil para saber el ROL
+            console.log("2. Solicitando perfil a /api/v1/users/me...");
             const response = await fetch('http://localhost:8000/api/v1/users/me', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            if (!response.ok) throw new Error("Error obteniendo perfil");
+            console.log("3. Estado de la respuesta (HTTP Status):", response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("4. Error en respuesta del servidor:", errorText);
+                throw new Error(`Error ${response.status}: ${errorText}`);
+            }
 
             const userData = await response.json();
+            console.log("5. Datos de usuario recibidos (JSON):", userData);
+            console.log("6. ROL DETECTADO:", userData.role);
 
-            // Redirigir según rol
             if (userData.role === 'admin') {
+                console.log("7. Redirigiendo a /admin...");
                 navigate('/admin');
                 toast.success(`Bienvenido Admin, ${userData.full_name}`);
             } else {
+                console.log("7. Redirigiendo a /dashboard (Rol no es admin)...");
                 navigate('/dashboard');
                 toast.success(`¡Hola de nuevo, ${userData.full_name}!`);
             }
 
         } catch (error) {
-            console.error("Error redirect:", error);
-            // Si falla obtener el perfil, por seguridad mandamos al dashboard normal
-            navigate('/dashboard');
+            console.error("❌ ERROR CRÍTICO durante el proceso de login:", error);
+            throw error;
         }
     };
 
-    // Autenticación social
     const authenticateWithBackendSocial = async (firebaseToken: string) => {
+        console.log("Enviando token de Firebase al backend...");
         const response = await fetch('http://localhost:8000/api/v1/auth/login/social', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -55,6 +63,7 @@ export default function LoginPage() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || 'Error al validar con el servidor');
 
+        console.log("Backend devolvió token de acceso correctamente.");
         return data.access_token;
     };
 
@@ -68,30 +77,32 @@ export default function LoginPage() {
         const loadingToast = toast.loading('Conectando con proveedor...');
 
         try {
-            // Firebase Login
             const result = await signInWithPopup(auth, provider);
             const fbToken = await result.user.getIdToken();
 
-            // Backend Login
             toast.loading('Verificando cuenta...', { id: loadingToast });
             const backendToken = await authenticateWithBackendSocial(fbToken);
 
-            // Redirección inteligente
             toast.dismiss(loadingToast);
             await handleSuccessfulLogin(backendToken);
 
         } catch (error: any) {
-            console.error(error);
+            console.error("Error en social login:", error);
+            toast.dismiss(loadingToast);
+
             let msg = "Error al iniciar sesión";
-            if (error.code === 'auth/popup-closed-by-user') msg = "Has cancelado el inicio de sesión";
-            else if (error.message) msg = error.message;
-            toast.error(msg, { id: loadingToast });
+            if (error.code === 'auth/popup-closed-by-user') {
+                msg = "Has cancelado el inicio de sesión";
+            } else if (error.message) {
+                msg = error.message;
+            }
+
+            toast.error(msg);
         } finally {
             setIsLoading(false);
         }
     };
 
-    //  Login basico (Email/Pass)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -102,6 +113,7 @@ export default function LoginPage() {
             formData.append('username', email);
             formData.append('password', password);
 
+            console.log("Enviando credenciales al backend...");
             const response = await fetch('http://localhost:8000/api/v1/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -111,12 +123,14 @@ export default function LoginPage() {
             const data = await response.json();
             if (!response.ok) throw new Error(data.detail || 'Credenciales incorrectas');
 
+            console.log("Login correcto. Token recibido.");
             toast.dismiss(loadingToast);
             await handleSuccessfulLogin(data.access_token);
 
         } catch (error: any) {
-            console.error("Error login:", error);
-            toast.error(error.message || "Error al iniciar sesión", { id: loadingToast });
+            console.error("Error login manual:", error);
+            toast.dismiss(loadingToast);
+            toast.error(error.message || "Error al iniciar sesión");
         } finally {
             setIsLoading(false);
         }
@@ -124,7 +138,6 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen bg-black text-white overflow-hidden relative flex flex-col">
-            {/* Fondo */}
             <div className="fixed inset-0 z-0">
                 <img
                     src="/images/comunidad_1.jpg"
@@ -134,7 +147,6 @@ export default function LoginPage() {
                 <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
             </div>
 
-            {/* Menu */}
             <nav className="relative z-10 px-6 py-6 w-full">
                 <div className="max-w-7xl mx-auto flex justify-between items-center">
                     <button
@@ -155,10 +167,8 @@ export default function LoginPage() {
                 </div>
             </nav>
 
-            {/* Formulario Login */}
             <div className="relative z-10 flex-grow flex items-center justify-center px-6 py-12">
                 <div className="w-full max-w-md">
-                    {/* Header */}
                     <div className="text-center mb-10">
                         <div className="inline-flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur-md border border-white/20 rounded-full mb-6">
                             <Lock size={28} className="text-white" />
@@ -172,9 +182,7 @@ export default function LoginPage() {
                         </p>
                     </div>
 
-                    {/* Formulario */}
                     <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl space-y-6 shadow-2xl">
-                        {/* Campo email */}
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2 ml-1">
                                 Correo electrónico
@@ -195,7 +203,6 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        {/* Campo contraseña */}
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2 ml-1">
                                 Contraseña
@@ -223,7 +230,6 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        {/* Opciones extra */}
                         <div className="flex items-center justify-between text-sm px-1">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <input
@@ -242,7 +248,6 @@ export default function LoginPage() {
                             </button>
                         </div>
 
-                        {/* Botón de envío */}
                         <button
                             type="submit"
                             disabled={isLoading}
@@ -261,7 +266,6 @@ export default function LoginPage() {
                             )}
                         </button>
 
-                        {/* Divider */}
                         <div className="relative my-8">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-white/10" />
@@ -273,9 +277,7 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        {/* Botones sociales */}
                         <div className="grid grid-cols-3 gap-4">
-                            {/* Google */}
                             <button
                                 type="button"
                                 onClick={() => handleSocialLogin(googleProvider)}
@@ -289,20 +291,6 @@ export default function LoginPage() {
                                 </svg>
                                 <span className="text-sm font-medium hidden sm:block">Google</span>
                             </button>
-
-                            {/* Facebook */}
-                            <button
-                                type="button"
-                                onClick={() => handleSocialLogin(facebookProvider)}
-                                className="py-3 rounded-xl bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/30 transition flex items-center justify-center gap-2 cursor-pointer bg-transparent"
-                            >
-                                <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.791-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                                </svg>
-                                <span className="text-sm font-medium text-white hidden sm:block">Facebook</span>
-                            </button>
-
-                            {/* GitHub */}
                             <button
                                 type="button"
                                 onClick={() => handleSocialLogin(githubProvider)}
@@ -315,7 +303,6 @@ export default function LoginPage() {
                             </button>
                         </div>
 
-                        {/* Footer links */}
                         <div className="text-center mt-8">
                             <p className="text-sm text-gray-500">
                                 ¿Necesitas ayuda?{' '}

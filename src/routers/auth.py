@@ -28,7 +28,6 @@ class ResendSchema(BaseModel):
     email: EmailStr
 
 
-
 @router.post("/login", response_model=Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
@@ -43,8 +42,11 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
         raise HTTPException(status_code=400, detail="Cuenta no verificada. Revisa tu correo.")
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    # --- CAMBIO IMPORTANTE: Incluimos el rol en el token ---
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email, "role": user.role},
+        expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -71,7 +73,10 @@ def social_login(schema: SocialLoginSchema, db: Session = Depends(get_db)):
         db.refresh(new_user)
         user = new_user
 
-    access_token = create_access_token(data={"sub": user.email})
+    # --- CAMBIO IMPORTANTE: Incluimos el rol aquí también ---
+    access_token = create_access_token(
+        data={"sub": user.email, "role": user.role}
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 

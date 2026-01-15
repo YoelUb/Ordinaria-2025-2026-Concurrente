@@ -5,7 +5,6 @@ from src.core.config import settings
 from src.services.firebase import initialize_firebase
 from src.routers import users, auth, reservations
 from src.services.storage import init_bucket
-# --- IMPORTACIÓN NUEVA ---
 from src.scripts.init_db import create_initial_data
 
 @asynccontextmanager

@@ -2,7 +2,7 @@ import {useState, useEffect, useRef} from 'react';
 import {Lock, Mail, Eye, EyeOff, User, Phone, ArrowRight, Home, AlertCircle, MapPin, Loader2, CheckCircle, X} from 'lucide-react';
 import {signInWithPopup} from "firebase/auth";
 import {auth, googleProvider, githubProvider} from "../../config/Firebase";
-import {useNavigate} from 'react-router-dom';
+import {useNavigate, Link} from 'react-router-dom'; // Añadido Link
 import toast from 'react-hot-toast';
 
 // --- Expresiones Regulares Actualizadas ---
@@ -658,7 +658,23 @@ export default function RegisterPage() {
                                     className="w-5 h-5 rounded border-gray-600 bg-transparent cursor-pointer mt-0.5 accent-white"
                                 />
                                 <span className="text-sm text-gray-400 group-hover:text-white transition leading-relaxed">
-                                    Acepto los términos y la política de privacidad.
+                                    Acepto los{' '}
+                                    <Link
+                                        to="/legal/terms-conditions"
+                                        className="text-white hover:underline font-medium"
+                                        onClick={(e) => e.stopPropagation()} // Prevenir cambio del checkbox al hacer clic
+                                    >
+                                        términos
+                                    </Link>{' '}
+                                    y la{' '}
+                                    <Link
+                                        to="/legal/privacy-policy"
+                                        className="text-white hover:underline font-medium"
+                                        onClick={(e) => e.stopPropagation()} // Prevenir cambio del checkbox al hacer clic
+                                    >
+                                        política de privacidad
+                                    </Link>
+                                    .
                                 </span>
                             </label>
                         </div>
@@ -695,19 +711,6 @@ export default function RegisterPage() {
                                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                                 </svg>
                                 <span className="text-sm font-medium hidden sm:block">Google</span>
-                            </button>
-
-                            {/* Facebook */}
-                            <button
-                                type="button"
-                                onClick={() => handleSocialLogin(null)}
-                                disabled={isLoading}
-                                className="py-3 rounded-xl bg-blue-600/20 border border-blue-500/30 hover:bg-blue-600/30 transition flex items-center justify-center gap-2 cursor-pointer bg-transparent text-white disabled:opacity-50"
-                            >
-                                <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.791-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                                </svg>
-                                <span className="text-sm font-medium hidden sm:block">Facebook</span>
                             </button>
 
                             {/* GitHub */}
