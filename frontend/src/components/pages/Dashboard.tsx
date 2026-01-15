@@ -1,8 +1,8 @@
-import {useState, useEffect, useRef} from 'react';
+import {useState, useEffect, useRef, useCallback} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
     Calendar, User, Settings, LogOut, Home, Bell, Search, Plus,
-    X, Loader2, Save, MapPin, AlertCircle, Camera, Trash2, Sun, Moon, Menu, CheckCircle, Users
+    X, Loader2, Save, MapPin, AlertCircle, Camera, Trash2, Sun, Moon, Menu, CheckCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,6 +18,7 @@ interface Reservation {
     start_time: string;
     end_time: string;
     status?: string;
+    price?: number;
 }
 
 interface UserProfile {
@@ -55,6 +56,13 @@ interface FacilityInfo {
     currentReservations: number;
     icon: string;
     color: string;
+}
+
+interface AvailabilitySlot {
+    start: string;
+    end: string;
+    count: number;
+    capacity: number;
 }
 
 const TIME_SLOTS = [
@@ -112,7 +120,7 @@ export default function Dashboard() {
 
     // Referencias
     const toastShownRef = useRef(false);
-    const notificationProcessedRef = useRef(false);
+    const notificationProcessedRef = useRef({payment: false, cancel: false});
     const wrapperRef = useRef<HTMLDivElement>(null);
     const notificationRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,14 +137,20 @@ export default function Dashboard() {
 
     // Estados Datos
     const [user, setUser] = useState<UserProfile | null>(null);
-    const [reservations, setReservations] = useState<Reservation[]>([
-        { id: 1, facility: 'Pádel Court 1', start_time: '2024-01-15T10:30:00', end_time: '2024-01-15T12:00:00', status: 'Confirmada' },
-        { id: 2, facility: 'Piscina', start_time: '2024-01-16T15:00:00', end_time: '2024-01-16T16:30:00', status: 'Confirmada' },
-        { id: 3, facility: 'Gimnasio', start_time: '2024-01-14T18:00:00', end_time: '2024-01-14T19:30:00', status: 'Pendiente' },
-    ]);
-    const [notifications, setNotifications] = useState<Notification[]>([
-        {id: 1, text: "Bienvenido al sistema residencial", read: true, time: "Sistema"}
-    ]);
+    const [reservations, setReservations] = useState<Reservation[]>([]);
+
+    // Notificaciones persistentes
+    const [notifications, setNotifications] = useState<Notification[]>(() => {
+        const saved = localStorage.getItem('notifications');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                return [{id: 1, text: "Bienvenido al sistema residencial", read: true, time: "Sistema"}];
+            }
+        }
+        return [{id: 1, text: "Bienvenido al sistema residencial", read: true, time: "Sistema"}];
+    });
 
     // Estados Carga
     const [loading, setLoading] = useState(true);
@@ -155,13 +169,15 @@ export default function Dashboard() {
         return `${year}-${month}-${day}`;
     });
     const [selectedTimeSlot, setSelectedTimeSlot] = useState<string | null>(null);
-    const [busySlots, setBusySlots] = useState<string[]>([]);
+
+    // Almacena disponibilidad por slot {hora: {count, capacity}}
+    const [slotAvailability, setSlotAvailability] = useState<{[key: string]: AvailabilitySlot}>({});
     const [loadingSlots, setLoadingSlots] = useState(false);
 
-    // Información de capacidad (convertido a estado)
-    const [facilityCapacity, setFacilityCapacity] = useState<{[key: string]: FacilityInfo}>({
-        'Pádel Court 1': { name: 'Pádel Court 1', price: 15.00, capacity: 4, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
-        'Pádel Court 2': { name: 'Pádel Court 2', price: 15.00, capacity: 4, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
+    // Configuración estática de instalaciones (debe coincidir con backend)
+    const [facilitiesConfig] = useState<{[key: string]: FacilityInfo}>({
+        'Pádel court 1': { name: 'Pádel Court 1', price: 15.00, capacity: 1, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
+        'Pádel court 2': { name: 'Pádel Court 2', price: 15.00, capacity: 1, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
         'Piscina': { name: 'Piscina', price: 8.00, capacity: 20, currentReservations: 0, icon: '🏊', color: 'from-cyan-500 to-teal-500' },
         'Gimnasio': { name: 'Gimnasio', price: 5.00, capacity: 30, currentReservations: 0, icon: '💪', color: 'from-purple-500 to-pink-500' },
         'Sauna': { name: 'Sauna', price: 10.00, capacity: 10, currentReservations: 0, icon: '🔥', color: 'from-orange-500 to-red-500' }
@@ -178,8 +194,13 @@ export default function Dashboard() {
         document.documentElement.classList.toggle('dark', isDarkMode);
     }, [isDarkMode]);
 
-    // Función para cargar datos del backend
-    const fetchData = async () => {
+    // --- PERSISTIR NOTIFICACIONES ---
+    useEffect(() => {
+        localStorage.setItem('notifications', JSON.stringify(notifications));
+    }, [notifications]);
+
+    // Función para cargar datos del usuario y reservas
+    const fetchData = useCallback(async () => {
         const token = localStorage.getItem('token');
         if (!token) {
             navigate('/login');
@@ -219,37 +240,14 @@ export default function Dashboard() {
                 }
             }
 
-            // Cargar reservas
+            // Cargar reservas del usuario
             const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', {headers});
             if (resResponse.ok) {
                 const resData = await resResponse.json();
                 const sortedRes = resData.sort((a: Reservation, b: Reservation) =>
                     new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
                 );
-
-                if (JSON.stringify(sortedRes) !== JSON.stringify(reservations)) {
-                    setReservations(sortedRes);
-                }
-            }
-
-            // Cargar capacidad de instalaciones
-            const capacityResponse = await fetch('http://localhost:8000/api/v1/reservations/capacity', {headers});
-            if (capacityResponse.ok) {
-                const capacityData = await capacityResponse.json();
-
-                // Actualizar facilityCapacity con datos reales
-                setFacilityCapacity(prev => {
-                    const updated = { ...prev };
-                    Object.keys(updated).forEach(facilityName => {
-                        if (capacityData[facilityName]) {
-                            updated[facilityName] = {
-                                ...updated[facilityName],
-                                currentReservations: capacityData[facilityName].current || 0
-                            };
-                        }
-                    });
-                    return updated;
-                });
+                setReservations(sortedRes);
             }
 
         } catch (error) {
@@ -257,7 +255,7 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [navigate, showCompleteProfile]);
 
     // --- 1. Cargar Datos y Polling ---
     useEffect(() => {
@@ -270,39 +268,42 @@ export default function Dashboard() {
         }, 30000);
 
         return () => clearInterval(intervalId);
-    }, [navigate]);
+    }, [fetchData]);
 
-    // --- 2. Notificaciones ---
+    // --- 2. Notificaciones de Pago y Cancelación ---
     useEffect(() => {
-        if (notificationProcessedRef.current) return;
         const paymentSuccess = localStorage.getItem('paymentSuccess');
         const reservationCancelled = localStorage.getItem('reservationCancelled');
 
-        if (paymentSuccess) {
-            notificationProcessedRef.current = true;
+        if (paymentSuccess && !notificationProcessedRef.current.payment) {
+            notificationProcessedRef.current.payment = true;
+
             const newNotif = {
                 id: Date.now(),
                 text: "¡Reserva confirmada exitosamente!",
                 read: false,
-                time: "Ahora mismo"
+                time: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})
             };
+
             setNotifications(prev => [newNotif, ...prev]);
             localStorage.removeItem('paymentSuccess');
             setShowNotifications(true);
             setTimeout(() => setShowNotifications(false), 4000);
 
-            // Recargar datos después de una reserva exitosa
+            // Recargar datos después de reserva exitosa
             fetchData();
         }
 
-        if (reservationCancelled) {
-            notificationProcessedRef.current = true;
+        if (reservationCancelled && !notificationProcessedRef.current.cancel) {
+            notificationProcessedRef.current.cancel = true;
+
             const newNotif = {
                 id: Date.now(),
                 text: "Reserva cancelada correctamente",
                 read: false,
-                time: "Ahora mismo"
+                time: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})
             };
+
             setNotifications(prev => [newNotif, ...prev]);
             localStorage.removeItem('reservationCancelled');
             setShowNotifications(true);
@@ -311,69 +312,59 @@ export default function Dashboard() {
             // Recargar datos después de cancelar
             fetchData();
         }
-    }, []);
+    }, [fetchData]);
 
-    // --- 3. Disponibilidad y Capacidad ---
+    // --- 3. Cargar Disponibilidad cuando se abre el modal ---
     useEffect(() => {
-        if (!showReserveModal) return;
+        if (!showReserveModal) {
+            setSlotAvailability({});
+            setSelectedTimeSlot(null);
+            return;
+        }
 
-        const fetchAvailabilityAndCapacity = async () => {
+        const fetchAvailability = async () => {
             try {
                 const token = localStorage.getItem('token');
-
-                // Obtener disponibilidad de horarios
-                const availabilityResponse = await fetch(
+                const response = await fetch(
                     `http://localhost:8000/api/v1/reservations/availability?facility=${encodeURIComponent(newResFacility)}&date_str=${newResDate}`,
                     {headers: {'Authorization': `Bearer ${token}`}}
                 );
 
-                if (availabilityResponse.ok) {
-                    const data = await availabilityResponse.json();
-                    const occupiedStartTimes = data.map((slot: any) => {
+                if (response.ok) {
+                    const data: AvailabilitySlot[] = await response.json();
+
+                    // Convertir a mapa por hora
+                    const availabilityMap: {[key: string]: AvailabilitySlot} = {};
+
+                    data.forEach((slot) => {
                         const date = new Date(slot.start);
                         const hours = date.getHours().toString().padStart(2, '0');
                         const minutes = date.getMinutes().toString().padStart(2, '0');
-                        return `${hours}:${minutes}`;
+                        const timeKey = `${hours}:${minutes}`;
+
+                        availabilityMap[timeKey] = {
+                            ...slot,
+                            capacity: slot.capacity || facilitiesConfig[newResFacility]?.capacity || 1
+                        };
                     });
-                    setBusySlots(occupiedStartTimes);
+
+                    setSlotAvailability(availabilityMap);
                 }
-
-                // Actualizar capacidad en tiempo real mientras el modal esté abierto
-                const capacityResponse = await fetch('http://localhost:8000/api/v1/reservations/capacity', {
-                    headers: {'Authorization': `Bearer ${token}`}
-                });
-
-                if (capacityResponse.ok) {
-                    const capacityData = await capacityResponse.json();
-                    setFacilityCapacity(prev => {
-                        const updated = { ...prev };
-                        Object.keys(updated).forEach(facilityName => {
-                            if (capacityData[facilityName]) {
-                                updated[facilityName] = {
-                                    ...updated[facilityName],
-                                    currentReservations: capacityData[facilityName].current || 0
-                                };
-                            }
-                        });
-                        return updated;
-                    });
-                }
-
             } catch (error) {
-                console.error(error);
+                console.error("Error fetching availability", error);
             } finally {
                 setLoadingSlots(false);
             }
         };
 
         setLoadingSlots(true);
-        fetchAvailabilityAndCapacity();
+        fetchAvailability();
 
-        const interval = setInterval(fetchAvailabilityAndCapacity, 4000);
+        const interval = setInterval(fetchAvailability, 4000);
         return () => clearInterval(interval);
-    }, [newResFacility, newResDate, showReserveModal]);
+    }, [newResFacility, newResDate, showReserveModal, facilitiesConfig]);
 
-    // --- 4. Autocompletado ---
+    // --- 4. Autocompletado Dirección ---
     useEffect(() => {
         if (profileForm.address.length < 3 || !showAddressMenu) {
             setAddressSuggestions([]);
@@ -393,6 +384,7 @@ export default function Dashboard() {
         return () => clearTimeout(timeoutId);
     }, [profileForm.address, showAddressMenu]);
 
+    // --- 5. Manejar clicks fuera de elementos ---
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -443,7 +435,7 @@ export default function Dashboard() {
         setShowAddressMenu(false);
     };
 
-    // --- 5. Avatar (MinIO) ---
+    // --- 6. Avatar (MinIO) ---
     const triggerFileInput = (ref: React.RefObject<HTMLInputElement>) => {
         ref.current?.click();
     };
@@ -488,7 +480,7 @@ export default function Dashboard() {
         }
     };
 
-    // --- BORRAR RESERVA ---
+    // --- 7. BORRAR RESERVA ---
     const handleDeleteReservation = async (reservationId: number) => {
         setDeletingReservation(true);
         const loadingToast = toast.loading("Eliminando reserva...");
@@ -504,35 +496,27 @@ export default function Dashboard() {
                 // Actualizar estado local
                 setReservations(prev => prev.filter(res => res.id !== reservationId));
 
-                // Añadir notificación
-                const newNotif = {
-                    id: Date.now(),
-                    text: "Reserva eliminada correctamente",
-                    read: false,
-                    time: "Ahora mismo"
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-
-                // Guardar en localStorage para mostrar notificación al recargar
+                // Guardar en localStorage para mostrar notificación
                 localStorage.setItem('reservationCancelled', 'true');
-
-                // Recargar datos
-                fetchData();
 
                 toast.success("Reserva eliminada correctamente", {id: loadingToast});
                 setShowDeleteModal(false);
                 setReservationToDelete(null);
+
+                // Recargar datos
+                fetchData();
             } else {
-                throw new Error("Error al eliminar");
+                const errorData = await response.json();
+                throw new Error(errorData.detail || "Error al eliminar");
             }
         } catch (error) {
-            toast.error("No se pudo eliminar la reserva", {id: loadingToast});
+            toast.error(`No se pudo eliminar la reserva: ${error instanceof Error ? error.message : 'Error desconocido'}`, {id: loadingToast});
         } finally {
             setDeletingReservation(false);
         }
     };
 
-    // --- BORRAR CUENTA ---
+    // --- 8. BORRAR CUENTA ---
     const handleDeleteAccount = async () => {
         setDeletingAccount(true);
         const loadingToast = toast.loading("Eliminando cuenta...");
@@ -546,10 +530,14 @@ export default function Dashboard() {
 
             if (response.ok) {
                 toast.success("Cuenta eliminada correctamente", {id: loadingToast});
+
+                // Limpiar localStorage
                 localStorage.removeItem('token');
                 localStorage.removeItem('darkMode');
                 localStorage.removeItem('paymentSuccess');
                 localStorage.removeItem('reservationCancelled');
+                localStorage.removeItem('notifications');
+
                 navigate('/login');
             } else {
                 throw new Error("Error al eliminar cuenta");
@@ -561,7 +549,7 @@ export default function Dashboard() {
         }
     };
 
-    // --- 6. Buscador ---
+    // --- 9. Buscador ---
     const filteredReservations = reservations.filter(res => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
@@ -626,10 +614,11 @@ export default function Dashboard() {
                 setShowCompleteProfile(false);
                 toast.success("¡Perfil actualizado correctamente!", {id: loadingToast});
             } else {
-                throw new Error("Error al actualizar");
+                const errorData = await response.json();
+                throw new Error(errorData.detail || "Error al actualizar");
             }
         } catch (err) {
-            toast.error("Error de conexión", {id: loadingToast});
+            toast.error(`Error: ${err instanceof Error ? err.message : 'Error de conexión'}`, {id: loadingToast});
         } finally {
             setUpdatingProfile(false);
         }
@@ -662,25 +651,19 @@ export default function Dashboard() {
         const displayDate = startDateTime.toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'});
 
         // Obtener precio según la instalación
-        const facilityInfo = facilityCapacity[newResFacility];
+        const facilityInfo = facilitiesConfig[newResFacility];
         const price = facilityInfo ? facilityInfo.price : 15.00;
         const tax = price * 0.21;
         const total = price + tax;
 
-        // Verificar capacidad
-        const currentFacility = facilityCapacity[newResFacility];
-        if (currentFacility && currentFacility.currentReservations >= currentFacility.capacity) {
-            toast.error(`¡Capacidad completa! Solo hay ${currentFacility.capacity} plazas disponibles.`);
-            return;
-        }
+        // Verificar capacidad usando datos del backend
+        const slotInfo = slotAvailability[selectedTimeSlot];
+        const currentCapacity = slotInfo?.capacity || facilityInfo?.capacity || 1;
+        const currentCount = slotInfo?.count || 0;
 
-        // Mostrar advertencia de capacidad si está cerca del límite
-        const remaining = currentFacility.capacity - currentFacility.currentReservations;
-        if (remaining <= 3 && remaining > 0) {
-            toast(`¡Últimas ${remaining} plazas disponibles!`, {
-                icon: '⚠️',
-                duration: 4000
-            });
+        if (currentCount >= currentCapacity) {
+            toast.error(`¡Capacidad completa! Ya no hay plazas disponibles.`);
+            return;
         }
 
         setShowReserveModal(false);
@@ -704,7 +687,6 @@ export default function Dashboard() {
         });
     };
 
-    // Obtener fecha mínima para el input de fecha (hoy)
     const getMinDate = () => {
         const today = new Date();
         const year = today.getFullYear();
@@ -714,13 +696,13 @@ export default function Dashboard() {
     };
 
     if (loading) return <div
-        className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+        className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
         <Loader2 className="animate-spin text-purple-500" size={48}/>
     </div>;
 
     return (
         <div
-            className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'} relative`}>
+            className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'} relative`}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
                 * { font-family: 'Inter', sans-serif; }
@@ -741,7 +723,7 @@ export default function Dashboard() {
                 <Menu size={24}/>
             </button>
 
-            {/* Sidebar - CONTRASTE PERFECTO: BLANCO/NEGRO */}
+            {/* Sidebar */}
             <aside
                 className={`fixed left-0 top-0 h-screen w-64 glass border-r ${isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'} p-6 z-40 transition-transform duration-300 ${
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -774,13 +756,13 @@ export default function Dashboard() {
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-none cursor-pointer ${
                                 activeTab === item.id
                                     ? (isDarkMode ? 'bg-white text-black' : 'bg-gray-900 text-white')
-                                    : (isDarkMode ? 'text-white hover:text-white hover:bg-white/10' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100')
+                                    : (isDarkMode ? 'text-gray-200 hover:text-white hover:bg-white/10' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100')
                             }`}
                         >
-                            <span className={`${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-white' : 'text-gray-700')}`}>
+                            <span className={`${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-gray-200' : 'text-gray-600')}`}>
                                 {item.icon}
                             </span>
-                            <span className={`font-medium ${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-white' : 'text-gray-700')}`}>
+                            <span className={`font-medium ${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-gray-200' : 'text-gray-700')}`}>
                                 {item.label}
                             </span>
                         </button>
@@ -788,7 +770,7 @@ export default function Dashboard() {
                 </nav>
 
                 <button onClick={handleLogout}
-                        className={`absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-3 transition cursor-pointer bg-transparent border-none ${isDarkMode ? 'text-white hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                        className={`absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-3 transition cursor-pointer bg-transparent border-none ${isDarkMode ? 'text-gray-200 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                     <LogOut size={20}/>
                     <span>Cerrar sesión</span>
                 </button>
@@ -802,7 +784,7 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* Main Content - CONTRASTE PERFECTO */}
+            {/* Main Content */}
             <main className="md:ml-64 p-4 md:p-8 pt-20 md:pt-8">
                 <header className="flex justify-between items-center mb-8 md:mb-12">
                     <div className="md:ml-0 ml-12 md:ml-0">
@@ -824,7 +806,6 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-4">
-                        {/* Buscador */}
                         <div className="relative group hidden md:block">
                             <div
                                 className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
@@ -908,7 +889,7 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Reservas totales</p>
-                                        <p className={`text-2xl md:text-3xl font-light ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{reservations.length}</p>
+                                        <p className="text-2xl md:text-3xl font-light">{reservations.length}</p>
                                     </div>
                                 </div>
                             </div>
@@ -919,7 +900,7 @@ export default function Dashboard() {
                                 recientes {searchQuery && "(Filtrado)"}</h2>
                             <div className="space-y-3 md:space-y-4">
                                 {filteredReservations.length === 0 ? (
-                                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No hay reservas que coincidan.</p>
+                                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No tienes reservas activas.</p>
                                 ) : (
                                     filteredReservations.slice(0, 3).map((res) => (
                                         <div key={res.id}
@@ -947,7 +928,7 @@ export default function Dashboard() {
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                            {Object.values(facilityCapacity).map((facility, i) => (
+                            {Object.values(facilitiesConfig).map((facility, i) => (
                                 <button key={i} onClick={() => {
                                     setNewResFacility(facility.name);
                                     setShowReserveModal(true);
@@ -958,7 +939,7 @@ export default function Dashboard() {
                                         {facility.icon}
                                     </div>
                                     <p className="text-xs md:text-sm font-medium text-center">{facility.name}</p>
-                                    <p className="text-xs text-gray-500 mt-1">{facility.price}€</p>
+                                    <p className="text-xs text-gray-500 mt-1">{facility.price}€ • Capacidad: {facility.capacity} plaza{facility.capacity !== 1 ? 's' : ''}</p>
                                 </button>
                             ))}
                         </div>
@@ -971,7 +952,7 @@ export default function Dashboard() {
                         {filteredReservations.length === 0 ? (
                             <div className="glass p-8 md:p-12 text-center rounded-2xl">
                                 <Calendar className="mx-auto text-gray-500 mb-4" size={32}/>
-                                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No tienes reservas activas con ese criterio.</p>
+                                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>No tienes reservas activas.</p>
                             </div>
                         ) : (
                             filteredReservations.map((res) => (
@@ -993,6 +974,11 @@ export default function Dashboard() {
                                                 minute: '2-digit'
                                             })}
                                             </p>
+                                            {res.price && (
+                                                <p className={`text-xs mt-1 ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
+                                                    Precio pagado: {res.price.toFixed(2)}€
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-col md:flex-row items-end md:items-center gap-3 md:gap-4">
@@ -1194,70 +1180,15 @@ export default function Dashboard() {
                                 <select value={newResFacility}
                                         onChange={e => setNewResFacility(e.target.value)}
                                         className={`w-full border rounded-lg px-4 py-3 ${isDarkMode ? 'bg-black border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}>
-                                    {Object.values(facilityCapacity).map((facility, idx) => (
+                                    {Object.values(facilitiesConfig).map((facility, idx) => (
                                         <option key={idx} value={facility.name}>
-                                            {facility.name} - {facility.price}€ ({facility.capacity} plazas)
+                                            {facility.name} - {facility.price}€ ({facility.capacity} plaza{facility.capacity !== 1 ? 's' : ''}/horario)
                                         </option>
                                     ))}
                                 </select>
-                            </div>
-
-                            {/* Información de capacidad */}
-                            <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
-                                        <Users size={20} className="text-blue-500"/>
-                                    </div>
-                                    <div>
-                                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Información de capacidad</p>
-                                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                            {facilityCapacity[newResFacility]?.capacity || 0} plazas totales •
-                                            {facilityCapacity[newResFacility]?.currentReservations || 0} reservadas •
-                                            {facilityCapacity[newResFacility] ? facilityCapacity[newResFacility].capacity - facilityCapacity[newResFacility].currentReservations : 0} disponibles
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {/* Barra de progreso de capacidad */}
-                                <div className="mt-3">
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Ocupación</span>
-                                        <span className="font-medium">
-                                            {facilityCapacity[newResFacility] ?
-                                                Math.round((facilityCapacity[newResFacility].currentReservations / facilityCapacity[newResFacility].capacity) * 100) : 0}%
-                                        </span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                        <div
-                                            className={`h-2.5 rounded-full ${
-                                                (facilityCapacity[newResFacility]?.currentReservations || 0) >= (facilityCapacity[newResFacility]?.capacity || 1) ? 
-                                                'bg-red-500' : 
-                                                (facilityCapacity[newResFacility]?.currentReservations || 0) > (facilityCapacity[newResFacility]?.capacity || 1) * 0.8 ? 
-                                                'bg-yellow-500' : 
-                                                'bg-green-500'
-                                            }`}
-                                            style={{
-                                                width: `${Math.min(
-                                                    (facilityCapacity[newResFacility]?.currentReservations || 0) / (facilityCapacity[newResFacility]?.capacity || 1) * 100, 
-                                                    100
-                                                )}%`
-                                            }}
-                                        ></div>
-                                    </div>
-
-                                    {/* Advertencia si está cerca del límite */}
-                                    {(facilityCapacity[newResFacility]?.currentReservations || 0) >= (facilityCapacity[newResFacility]?.capacity || 1) ? (
-                                        <div className="flex items-center gap-2 mt-3 text-red-500 text-sm">
-                                            <AlertCircle size={16}/>
-                                            <span>¡Capacidad completa! No hay plazas disponibles.</span>
-                                        </div>
-                                    ) : (facilityCapacity[newResFacility]?.currentReservations || 0) > (facilityCapacity[newResFacility]?.capacity || 1) * 0.8 ? (
-                                        <div className="flex items-center gap-2 mt-3 text-amber-500 text-sm">
-                                            <AlertCircle size={16}/>
-                                            <span>¡Quedan pocas plazas! Reserva pronto.</span>
-                                        </div>
-                                    ) : null}
-                                </div>
+                                <p className={`text-xs mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                    Capacidad por horario: {facilitiesConfig[newResFacility]?.capacity || 1} plaza{facilitiesConfig[newResFacility]?.capacity !== 1 ? 's' : ''}
+                                </p>
                             </div>
 
                             <div>
@@ -1280,17 +1211,27 @@ export default function Dashboard() {
                                 ) : (
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
                                         {TIME_SLOTS.map((slot) => {
-                                            const isBusy = busySlots.includes(slot);
+                                            const slotInfo = slotAvailability[slot];
+                                            const currentCapacity = slotInfo?.capacity || facilitiesConfig[newResFacility]?.capacity || 1;
+                                            const currentCount = slotInfo?.count || 0;
+                                            const isFull = currentCount >= currentCapacity;
+                                            const available = currentCapacity - currentCount;
                                             const isSelected = selectedTimeSlot === slot;
+
+                                            // Colores según ocupación
+                                            let occupancyColor = isDarkMode ? 'text-green-400' : 'text-green-600';
+                                            if (isFull) occupancyColor = 'text-red-500';
+                                            else if (currentCount > 0) occupancyColor = isDarkMode ? 'text-amber-400' : 'text-amber-600';
+
                                             return (
                                                 <button
                                                     key={slot}
-                                                    disabled={isBusy}
+                                                    disabled={isFull}
                                                     onClick={() => setSelectedTimeSlot(slot)}
                                                     className={`
-                                                        py-3 rounded-xl border transition flex flex-col items-center justify-center gap-1 cursor-pointer text-sm
-                                                        ${isBusy
-                                                        ? 'bg-red-500/10 border-red-500/30 text-red-400 opacity-50 cursor-not-allowed'
+                                                        py-3 rounded-xl border transition flex flex-col items-center justify-center gap-1 cursor-pointer text-sm relative overflow-hidden
+                                                        ${isFull
+                                                        ? 'bg-red-500/10 border-red-500/30 opacity-60 cursor-not-allowed'
                                                         : isSelected
                                                             ? (isDarkMode ? 'bg-white text-black border-white' : 'bg-gray-900 text-white border-gray-900')
                                                             : (isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white' : 'bg-white border-gray-200 hover:bg-gray-100 text-gray-900')
@@ -1298,8 +1239,16 @@ export default function Dashboard() {
                                                     `}
                                                 >
                                                     <span className="font-medium">{slot}</span>
-                                                    <span
-                                                        className="text-[10px] uppercase font-bold">{isBusy ? 'Ocupado' : 'Libre'}</span>
+
+                                                    {/* Indicador de ocupación */}
+                                                    <span className={`text-[10px] font-semibold ${isSelected ? (isDarkMode ? 'text-gray-600' : 'text-gray-300') : occupancyColor}`}>
+                                                        {isFull ? 'COMPLETO' : `${available} disponible${available !== 1 ? 's' : ''}`}
+                                                    </span>
+
+                                                    {/* Detalle numérico (1/1) */}
+                                                    <span className={`text-[9px] ${isSelected ? 'opacity-80' : 'opacity-50'}`}>
+                                                        ({currentCount}/{currentCapacity})
+                                                    </span>
                                                 </button>
                                             );
                                         })}
@@ -1314,10 +1263,10 @@ export default function Dashboard() {
                                 </button>
                                 <button
                                     onClick={handleCreateReservation}
-                                    disabled={!selectedTimeSlot || (facilityCapacity[newResFacility]?.currentReservations || 0) >= (facilityCapacity[newResFacility]?.capacity || 1)}
+                                    disabled={!selectedTimeSlot || (slotAvailability[selectedTimeSlot || '']?.count || 0) >= (slotAvailability[selectedTimeSlot || '']?.capacity || facilitiesConfig[newResFacility]?.capacity || 1)}
                                     className={`flex-1 py-3 rounded-lg font-medium transition cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                                 >
-                                    Ir al Pago ({facilityCapacity[newResFacility]?.price || 15.00}€)
+                                    Ir al Pago ({facilitiesConfig[newResFacility]?.price || 15.00}€)
                                 </button>
                             </div>
                         </div>

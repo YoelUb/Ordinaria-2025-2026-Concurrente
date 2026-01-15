@@ -10,13 +10,21 @@ class Reservation(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
+    # Detalles de la reserva
     facility = Column(String, index=True, nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
 
-    # Precio pagado por esta reserva
+    # Campo nuevo para guardar el precio pagado
     price = Column(Float, nullable=False, default=0.0)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    status = Column(String, default="confirmed")  # Opcional, útil para el dashboard
 
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # Relación con Usuario
     user = relationship("User", back_populates="reservations")

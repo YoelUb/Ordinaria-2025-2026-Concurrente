@@ -87,7 +87,7 @@ export default function LandingPage() {
             title: 'Sauna',
             subtitle: 'Event Space',
             image: '/images/sauna.jpg',
-            specs: ['Capacidad 10 personas', 'Sistema de audio y video'],
+            specs: ['Capacidad 10 personas', 'Sistema de audio y video', "Termostato regulable"],
             price: 'Desde 10€/hora'
         }
     ];
