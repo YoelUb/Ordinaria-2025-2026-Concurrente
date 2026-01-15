@@ -15,12 +15,12 @@ interface Facility {
 
 // Configuración de visualización (Imágenes y textos que no están en BD)
 const FACILITY_ASSETS: { [key: string]: { image: string, subtitle: string, specs: string[] } } = {
-    'Pádel Court 1': {
+    'Padel Court 1': {
         image: '/images/padel_1.jpg',
         subtitle: 'Pista Principal',
         specs: ['Iluminación LED', 'Superficie Pro', 'Vestuarios']
     },
-    'Pádel Court 2': {
+    'Padel Court 2': {
         image: '/images/padel_2.jpg',
         subtitle: 'Pista Secundaria',
         specs: ['Iluminación LED', 'Césped Premium', 'Parking']
@@ -57,7 +57,6 @@ export default function LandingPage() {
     // --- ESTADOS PARA DATOS DINÁMICOS ---
     const [facilities, setFacilities] = useState<Facility[]>([]);
     const [loading, setLoading] = useState(true);
-    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
     const [errorCount, setErrorCount] = useState(0);
     const [isPollingActive] = useState(true);
     const [previousPrices, setPreviousPrices] = useState<{ [key: number]: number }>({});
@@ -118,7 +117,6 @@ export default function LandingPage() {
 
                 // Actualizar estado
                 setFacilities(sortedData);
-                setLastUpdate(new Date());
                 setErrorCount(0);
 
                 // Actualizar referencia de precios anteriores
@@ -305,25 +303,6 @@ export default function LandingPage() {
         return found ? `${found.price}€` : 'Consultar';
     };
 
-    // Formatear fecha de última actualización
-    const formatLastUpdate = () => {
-        if (!lastUpdate) return 'Nunca';
-
-        const now = new Date();
-        const diffMs = now.getTime() - lastUpdate.getTime();
-        const diffSecs = Math.floor(diffMs / 1000);
-        const diffMins = Math.floor(diffMs / 60000);
-
-        if (diffSecs < 10) return 'Justo ahora';
-        if (diffSecs < 60) return `Hace ${diffSecs} segundos`;
-        if (diffMins === 1) return 'Hace 1 minuto';
-        if (diffMins < 60) return `Hace ${diffMins} minutos`;
-
-        const diffHours = Math.floor(diffMins / 60);
-        if (diffHours === 1) return 'Hace 1 hora';
-        return `Hace ${diffHours} horas`;
-    };
-
     return (
         <div className="bg-black text-white overflow-x-hidden">
             {/* Notificación de cambios de precio */}
@@ -352,13 +331,13 @@ export default function LandingPage() {
                         </div>
                         <div className="hidden md:flex gap-8 text-sm font-medium">
                             <button onClick={() => scrollToSection('services')}
-                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Servicios
+                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">Servicios
                             </button>
                             <button onClick={() => scrollToSection('facilities')}
-                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Instalaciones
+                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">Instalaciones
                             </button>
                             <button onClick={() => scrollToSection('features')}
-                                    className="hover:text-gray-400 transition bg-transparent border-none cursor-pointer text-white">Beneficios
+                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">Beneficios
                             </button>
                         </div>
                         <button onClick={handleReserveAction}
@@ -381,11 +360,11 @@ export default function LandingPage() {
                         opacity: Math.max(0, 1 - scrollY * 0.003),
                         transform: `translateY(${scrollY * 0.5}px)`
                     }}>
-                        <p className="text-gray-400 text-sm tracking-[0.3em] uppercase mb-6 font-medium">Sistema de
+                        <p className="text-gray-300 text-sm tracking-[0.3em] uppercase mb-6 font-medium">Sistema de
                             Gestión Comunitaria</p>
                         <h1 className="text-6xl md:text-8xl lg:text-[10rem] font-extralight mb-8 leading-[0.9] text-glow">Elegancia.<br/><span
                             className="font-semibold">Simplicidad.</span></h1>
-                        <p className="text-xl md:text-2xl text-gray-300 font-light max-w-2xl mx-auto mb-12 leading-relaxed">Gestiona
+                        <p className="text-xl md:text-2xl text-white font-light max-w-2xl mx-auto mb-12 leading-relaxed">Gestiona
                             reservas de instalaciones deportivas<br className="hidden md:block"/> con la experiencia que
                             mereces.</p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -410,12 +389,12 @@ export default function LandingPage() {
                 <div className="max-w-7xl mx-auto">
                     <div className="flex justify-between items-center mb-16">
                         <div className="text-center md:text-left">
-                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Explora
+                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Explora
                                 nuestras instalaciones</p>
                             <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Todos los servicios.<br/><span
                                 className="font-semibold">A tu alcance.</span></h2>
                         </div>
-                        <div className="hidden md:flex items-center gap-3 text-sm text-gray-400">
+                        <div className="hidden md:flex items-center gap-3 text-sm text-gray-300">
                             <div
                                 className={`w-2 h-2 rounded-full ${isPollingActive ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}/>
                             <span>Actualización cada 4s</span>
@@ -429,9 +408,8 @@ export default function LandingPage() {
                     ) : (
                         <>
                             <div className="flex justify-between items-center mb-6">
-                                <div className="text-sm text-gray-500">
-                                    {facilities.length} instalaciones disponibles • Última
-                                    actualización: {formatLastUpdate()}
+                                <div className="text-sm text-gray-300">
+                                    {facilities.length} instalaciones disponibles
                                 </div>
                                 <div className="flex gap-3">
                                     <button onClick={() => scrollCarousel('left')}
@@ -465,16 +443,6 @@ export default function LandingPage() {
                                     return (
                                         <div key={fac.id}
                                              className="service-card glass rounded-2xl overflow-hidden w-[300px] sm:w-[350px] md:w-[380px] flex-shrink-0 border border-white/10 group hover:border-white/30 transition-all duration-300 snap-start">
-                                            {/* Badge de precio actualizado */}
-                                            <div className="absolute top-4 right-4 z-10">
-                                                <div
-                                                    className="bg-black/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs flex items-center gap-1">
-                                                    <span
-                                                        className={`w-1.5 h-1.5 rounded-full ${isPollingActive ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}></span>
-                                                    <span className="font-medium">Precio actual</span>
-                                                </div>
-                                            </div>
-
                                             <div className="relative h-64 overflow-hidden">
                                                 <img src={assets.image} alt={fac.name}
                                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -482,30 +450,30 @@ export default function LandingPage() {
                                                 <div
                                                     className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"/>
                                                 <div className="absolute bottom-4 left-4 right-4">
-                                                    <p className="text-xs tracking-widest text-gray-400 mb-1 uppercase">{assets.subtitle}</p>
-                                                    <h3 className="text-2xl font-semibold">{fac.name}</h3>
+                                                    <p className="text-xs tracking-widest text-gray-300 mb-1 uppercase">{assets.subtitle}</p>
+                                                    <h3 className="text-2xl font-semibold text-white">{fac.name}</h3>
                                                 </div>
                                             </div>
                                             <div className="p-6">
                                                 <div className="space-y-2 mb-4">
                                                     {assets.specs.map((sp, i) => (
                                                         <div key={i}
-                                                             className="flex items-center gap-2 text-sm text-gray-400">
-                                                            <div className="w-1 h-1 bg-white/50 rounded-full"></div>
+                                                             className="flex items-center gap-2 text-sm text-gray-300">
+                                                            <div className="w-1 h-1 bg-white/70 rounded-full"></div>
                                                             {sp}
                                                         </div>
                                                     ))}
-                                                    <div className="flex items-center gap-2 text-sm text-gray-400">
-                                                        <div className="w-1 h-1 bg-white/50 rounded-full"></div>
+                                                    <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                        <div className="w-1 h-1 bg-white/70 rounded-full"></div>
                                                         Aforo máx: {fac.capacity} pers.
                                                     </div>
                                                 </div>
                                                 <div
                                                     className="flex justify-between items-center pt-4 border-t border-white/10">
                                                     <div className="flex flex-col">
-                                                        <span className="text-sm font-medium text-gray-400">Precio por hora</span>
+                                                        <span className="text-sm font-medium text-gray-300">Precio por hora</span>
                                                         <span
-                                                            className="text-2xl font-bold text-white">{fac.price}€</span>
+                                                            className="text-2xl font-bold text-cyan-400">{fac.price}€</span>
                                                     </div>
                                                     <button onClick={handleReserveAction}
                                                             className="text-sm font-medium hover:text-gray-300 transition cursor-pointer bg-transparent border-none text-white group-hover:translate-x-2 transition-transform">
@@ -520,7 +488,7 @@ export default function LandingPage() {
 
                             {facilities.length === 0 && !loading && (
                                 <div className="text-center py-12 glass rounded-2xl border border-white/10">
-                                    <p className="text-gray-400">No hay instalaciones disponibles en este momento.</p>
+                                    <p className="text-gray-300">No hay instalaciones disponibles en este momento.</p>
                                     <button onClick={() => fetchFacilities(false, true)}
                                             className="mt-4 text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition">
                                         Reintentar
@@ -528,7 +496,7 @@ export default function LandingPage() {
                                 </div>
                             )}
 
-                            <div className="text-center mt-8 flex justify-between items-center text-sm text-gray-500">
+                            <div className="text-center mt-8 flex justify-between items-center text-sm text-gray-300">
                                 <p>← Desliza para ver más →</p>
                             </div>
                         </>
@@ -544,18 +512,18 @@ export default function LandingPage() {
                             opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 300)),
                             transform: `translateX(${Math.max(-50, -50 + (scrollY - 1500) / 10)}px)`
                         }}>
-                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Deporte
+                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Deporte
                                 Premium</p>
-                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Pistas de<br/><span
+                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight text-white">Pistas de<br/><span
                                 className="font-semibold">Pádel</span></h2>
-                            <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">Tres pistas
+                            <p className="text-xl text-gray-300 mb-8 leading-relaxed font-light">Tres pistas
                                 profesionales con iluminación LED de última generación. Superficie de juego premium y
                                 sistema de reserva inteligente.</p>
-                            <ul className="space-y-3 text-gray-400">
+                            <ul className="space-y-3 text-gray-300">
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                                     Precio desde: <span
-                                    className="text-white font-semibold">{getPrice('Pádel')} / hora</span>
+                                    className="text-cyan-400 font-semibold">{getPrice('Pádel')} / hora</span>
                                     {isPollingActive }
                                 </li>
                                 <li className="flex items-center gap-3">
@@ -598,21 +566,21 @@ export default function LandingPage() {
                             opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 300)),
                             transform: `translateX(${Math.min(50, 50 - (scrollY - 2500) / 10)}px)`
                         }}>
-                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Wellness &
+                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Wellness &
                                 Relax</p>
-                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Piscina<br/><span
+                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight text-white">Piscina<br/><span
                                 className="font-semibold">Climatizada</span></h2>
-                            <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">Disfruta todo el año de
+                            <p className="text-xl text-gray-300 mb-8 leading-relaxed font-light">Disfruta todo el año de
                                 nuestra piscina climatizada con tecnología de purificación salina y control de aforo
                                 inteligente.</p>
-                            <ul className="space-y-3 text-gray-400">
+                            <ul className="space-y-3 text-gray-300">
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                                     Temperatura constante 28°C
                                 </li>
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Precio actual: <span className="text-white font-semibold">{getPrice('Piscina')} / sesión</span>
+                                    Precio actual: <span className="text-cyan-400 font-semibold">{getPrice('Piscina')} / sesión</span>
                                     {isPollingActive}
                                 </li>
                                 <li className="flex items-center gap-3">
@@ -633,14 +601,14 @@ export default function LandingPage() {
                             opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 300)),
                             transform: `translateX(${Math.max(-50, -50 + (scrollY - 3500) / 10)}px)`
                         }}>
-                            <p className="text-sm tracking-[0.3em] text-gray-500 mb-4 uppercase font-medium">Fitness &
+                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Fitness &
                                 Training</p>
-                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Gimnasio<br/><span
+                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight text-white">Gimnasio<br/><span
                                 className="font-semibold">Completo</span></h2>
-                            <p className="text-xl text-gray-400 mb-8 leading-relaxed font-light">Equipamiento de última
+                            <p className="text-xl text-gray-300 mb-8 leading-relaxed font-light">Equipamiento de última
                                 generación en un espacio diseñado para tu bienestar. Mancuernas, máquinas
                                 cardiovasculares y zona de estiramientos.</p>
-                            <ul className="space-y-3 text-gray-400">
+                            <ul className="space-y-3 text-gray-300">
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                                     Acceso 24/7 para residentes
@@ -648,7 +616,7 @@ export default function LandingPage() {
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                                     Cuota de mantenimiento: <span
-                                    className="text-white font-semibold">{getPrice('Gimnasio')} / uso</span>
+                                    className="text-cyan-400 font-semibold">{getPrice('Gimnasio')} / uso</span>
                                     {isPollingActive}
                                 </li>
                                 <li className="flex items-center gap-3">
@@ -672,7 +640,7 @@ export default function LandingPage() {
             {/* Seccion de envio */}
             <section className="py-24 px-6 bg-gradient-to-b from-black to-gray-950">
                 <div className="max-w-5xl mx-auto text-center">
-                    <h2 className="text-4xl md:text-6xl font-light mb-12">¿Cómo hago la reserva?</h2>
+                    <h2 className="text-4xl md:text-6xl font-light mb-12 text-white">¿Cómo hago la reserva?</h2>
 
                     {/* Contenedor del Vídeo con Efecto Glass */}
                     <div
@@ -683,14 +651,14 @@ export default function LandingPage() {
                         </video>
                     </div>
 
-                    <p className="mt-8 text-gray-400 font-light text-lg">Descubre lo sencillo que es empezar a disfrutar
+                    <p className="mt-8 text-gray-300 font-light text-lg">Descubre lo sencillo que es empezar a disfrutar
                         de tus instalaciones.</p>
                 </div>
             </section>
 
             <section id="features" className="py-32 px-6 bg-black">
                 <div className="max-w-7xl mx-auto">
-                    <h2 className="text-5xl md:text-7xl font-light text-center mb-20 leading-tight">Diseñado
+                    <h2 className="text-5xl md:text-7xl font-light text-center mb-20 leading-tight text-white">Diseñado
                         para<br/><span className="font-semibold">tu comodidad.</span></h2>
                     <div className="grid md:grid-cols-3 gap-8">
                         {[
@@ -714,8 +682,8 @@ export default function LandingPage() {
                                  className="glass p-10 rounded-3xl hover:bg-white/10 transition-all duration-500 group border border-white/10">
                                 <div
                                     className="text-white/70 mb-6 group-hover:scale-110 transition-transform">{f.icon}</div>
-                                <h3 className="text-2xl font-semibold mb-4">{f.title}</h3>
-                                <p className="text-gray-400 leading-relaxed font-light">{f.desc}</p>
+                                <h3 className="text-2xl font-semibold mb-4 text-white">{f.title}</h3>
+                                <p className="text-gray-300 leading-relaxed font-light">{f.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -727,14 +695,14 @@ export default function LandingPage() {
                     <div className="glass p-16 rounded-3xl border border-white/10">
                         <div className="grid md:grid-cols-3 gap-12 text-center">
                             <div>
-                                <div className="text-6xl md:text-7xl font-extralight mb-4">500+</div>
-                                <p className="text-gray-400 text-lg font-light">Reservas mensuales</p></div>
+                                <div className="text-6xl md:text-7xl font-extralight mb-4 text-white">500+</div>
+                                <p className="text-gray-300 text-lg font-light">Reservas mensuales</p></div>
                             <div>
-                                <div className="text-6xl md:text-7xl font-extralight mb-4">98%</div>
-                                <p className="text-gray-400 text-lg font-light">Tasa de satisfacción</p></div>
+                                <div className="text-6xl md:text-7xl font-extralight mb-4 text-white">98%</div>
+                                <p className="text-gray-300 text-lg font-light">Tasa de satisfacción</p></div>
                             <div>
-                                <div className="text-6xl md:text-7xl font-extralight mb-4">24/7</div>
-                                <p className="text-gray-400 text-lg font-light">Disponibilidad total</p></div>
+                                <div className="text-6xl md:text-7xl font-extralight mb-4 text-white">24/7</div>
+                                <p className="text-gray-300 text-lg font-light">Disponibilidad total</p></div>
                         </div>
                     </div>
                 </div>
@@ -742,9 +710,9 @@ export default function LandingPage() {
 
             <section id="cta" className="py-32 px-6 text-center bg-gradient-to-b from-gray-950 to-black">
                 <div className="max-w-4xl mx-auto">
-                    <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight">Tu experiencia<br/><span
+                    <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight text-white">Tu experiencia<br/><span
                         className="font-semibold">comienza aquí.</span></h2>
-                    <p className="text-xl text-gray-400 mb-12 leading-relaxed font-light max-w-2xl mx-auto">Únete a una
+                    <p className="text-xl text-gray-300 mb-12 leading-relaxed font-light max-w-2xl mx-auto">Únete a una
                         comunidad que valora su tiempo y disfruta de instalaciones de primera clase.</p>
                     <button onClick={handleReserveAction}
                             className="bg-white text-black px-12 py-5 rounded-full text-xl font-medium hover:bg-gray-200 transition shadow-2xl inline-flex items-center gap-3 cursor-pointer border-none">
@@ -756,18 +724,18 @@ export default function LandingPage() {
             <footer className="border-t border-white/10 py-12 px-6 bg-black">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="flex flex-col gap-2">
-                        <p className="text-gray-500 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
+                        <p className="text-gray-300 text-sm font-light">© 2026 Sistema Residencial. Todos los derechos
                             reservados.</p>
                     </div>
-                    <div className="flex gap-6 text-sm text-gray-500 font-light">
+                    <div className="flex gap-6 text-sm text-gray-300 font-light">
                         <button onClick={() => window.location.href = '/privacy'}
-                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Privacidad
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-300">Privacidad
                         </button>
                         <button onClick={() => window.location.href = '/terms'}
-                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Términos
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-300">Términos
                         </button>
                         <button onClick={() => window.location.href = '/support'}
-                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-500">Soporte
+                                className="hover:text-white transition bg-transparent border-none cursor-pointer text-gray-300">Soporte
                         </button>
                     </div>
                 </div>

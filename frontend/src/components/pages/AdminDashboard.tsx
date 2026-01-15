@@ -543,10 +543,6 @@ export default function AdminDashboard() {
                                 <label className="text-sm text-gray-400 block mb-2">Precio (€/hora)</label>
                                 <input type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: parseFloat(e.target.value)})} className="w-full p-3 glass rounded-xl text-white outline-none focus:border-blue-500 border border-white/10"/>
                             </div>
-                            <div>
-                                <label className="text-sm text-gray-400 block mb-2">Capacidad (Personas)</label>
-                                <input type="number" value={editForm.capacity} onChange={e => setEditForm({...editForm, capacity: parseInt(e.target.value)})} className="w-full p-3 glass rounded-xl text-white outline-none focus:border-blue-500 border border-white/10"/>
-                            </div>
                         </div>
                         <div className="flex justify-end gap-3 mt-8">
                             <button onClick={() => setEditingFacility(null)} className="px-5 py-2.5 glass rounded-xl text-sm hover:bg-white/10 transition">Cancelar</button>

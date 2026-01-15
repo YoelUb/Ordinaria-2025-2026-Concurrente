@@ -660,7 +660,7 @@ export default function RegisterPage() {
                                 <span className="text-sm text-gray-400 group-hover:text-white transition leading-relaxed">
                                     Acepto los{' '}
                                     <Link
-                                        to="/legal/terms-conditions"
+                                        to="/terms"
                                         className="text-white hover:underline font-medium"
                                         onClick={(e) => e.stopPropagation()} // Prevenir cambio del checkbox al hacer clic
                                     >
@@ -668,7 +668,7 @@ export default function RegisterPage() {
                                     </Link>{' '}
                                     y la{' '}
                                     <Link
-                                        to="/legal/privacy-policy"
+                                        to="/privacy"
                                         className="text-white hover:underline font-medium"
                                         onClick={(e) => e.stopPropagation()} // Prevenir cambio del checkbox al hacer clic
                                     >
