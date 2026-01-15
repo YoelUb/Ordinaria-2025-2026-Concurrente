@@ -74,20 +74,29 @@ def social_login(schema: SocialLoginSchema, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Token inválido")
 
     email = decoded_user.get("email")
+
+    # --- FIX GITHUB: Si no viene nombre, usar el email o genérico ---
+    user_name = decoded_user.get("name")
+    if not user_name:
+        user_name = email.split("@")[0] if email else "Usuario GitHub"
+    # ---------------------------------------------------------------
+
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
         new_user = User(
             email=email,
-            full_name=decoded_user.get("name", "Usuario Nuevo"),
+            full_name=user_name,
             hashed_password=get_password_hash("social_login_pass"),
             is_active=True
         )
+        # --- ESTO FALTABA EN TU CÓDIGO ---
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
         user = new_user
 
+    # Generar token para el usuario (existente o nuevo)
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role}
     )

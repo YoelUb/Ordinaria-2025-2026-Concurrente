@@ -60,4 +60,4 @@ app.include_router(support.router, prefix="/api/v1/support", tags=["support"])
 
 @app.get("/")
 def root():
-    return {"message": "API Reservas Vecinos Funcionando"}
+    return {"message": "La app esta corriendo... OK"}

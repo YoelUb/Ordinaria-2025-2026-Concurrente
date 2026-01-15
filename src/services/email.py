@@ -1,21 +1,28 @@
 import smtplib
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from src.core.config import settings
 
+# --- CONFIGURACIÓN DE LOGS ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 def _send_email(to_email: str, subject: str, html_content: str):
     """
-    Función interna para manejar la conexión SMTP y el envío.
+    Función interna para manejar la conexión SMTP y el envío con LOGS detallados.
     """
-    if not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD:
-        print("⚠ ERROR: Faltan credenciales SMTP en el archivo .env")
-        return
+    logger.info(f"🚀 [EMAIL] Iniciando proceso de envío a: {to_email}")
 
-    # Lógica de desvío para Admin (Evitar spam al correo real del admin durante pruebas)
+    if not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD:
+        logger.error("❌ [EMAIL] ERROR CRÍTICO: Faltan credenciales SMTP en el archivo .env")
+        return False
+
+    # Lógica de desvío para Admin (Evitar spam al correo real durante pruebas)
     target_email = to_email
     if to_email == settings.ADMIN_EMAIL and settings.DEVIATION_EMAIL:
-        print(f"🔒 MODO ADMIN DETECTADO: Desviando correo de {to_email} a {settings.DEVIATION_EMAIL}")
+        logger.warning(f"🔒 [EMAIL] MODO ADMIN: Desviando correo de {to_email} a {settings.DEVIATION_EMAIL}")
         target_email = settings.DEVIATION_EMAIL
 
     msg = MIMEMultipart("alternative")
@@ -25,46 +32,50 @@ def _send_email(to_email: str, subject: str, html_content: str):
     msg.attach(MIMEText(html_content, "html"))
 
     try:
+        logger.info(f"🔌 [EMAIL] Conectando al servidor SMTP: {settings.MAIL_SERVER}:{settings.MAIL_PORT}...")
+
         with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT) as server:
-            server.starttls()
+            server.starttls()  # Seguridad TLS
+
+            logger.info(f"🔑 [EMAIL] Autenticando usuario: {settings.MAIL_USERNAME}")
             server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+
+            logger.info(f"📤 [EMAIL] Enviando paquete de datos...")
             server.sendmail(settings.MAIL_USERNAME, target_email, msg.as_string())
-            print(f"Email enviado correctamente a {target_email}")
+
+            logger.info(f"✅ [EMAIL] ¡ÉXITO! Correo entregado al servidor para: {target_email}")
             return True
+
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"❌ [EMAIL] ERROR DE AUTENTICACIÓN: Usuario o contraseña incorrectos.")
+        logger.error(f"    - Detalle técnico: {e}")
+        return False
+    except smtplib.SMTPConnectError as e:
+        logger.error(f"❌ [EMAIL] ERROR DE CONEXIÓN: No se pudo conectar al servidor SMTP.")
+        logger.error(f"    - Detalle técnico: {e}")
+        return False
     except Exception as e:
-        print(f"Error enviando email a {to_email}: {e}")
+        logger.error(f"❌ [EMAIL] ERROR DESCONOCIDO: {e}")
         return False
 
 
+# --- FUNCIONES PÚBLICAS ---
+
 def send_verification_email(to_email: str, code: str):
+    logger.info(f"📝 [EMAIL] Preparando email de VERIFICACIÓN para {to_email}")
     subject = "Código de verificación · Residencial"
     html_content = f"""
 <!DOCTYPE html>
 <html lang="es">
 <body style="margin:0; padding:0; background-color:#0a0a0a; font-family:sans-serif; color:#ffffff;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0; background-color:#0a0a0a;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#111111; border-radius:20px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.6);">
-          <tr>
-            <td style="padding:40px; text-align:center; background:linear-gradient(180deg, #0a0a0a 0%, #111111 100%);">
-              <div style="width:56px; height:56px; border-radius:50%; background:#ffffff; color:#000000; font-weight:700; font-size:20px; line-height:56px; text-align:center; margin:0 auto 20px;">R</div>
-              <h1 style="margin:20px 0 0; font-size:32px; font-weight:300;">Verifica tu<br><span style="font-weight:600;">cuenta</span></h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px;">
-              <p style="color:#d1d5db;">Introduce el siguiente código para completar tu registro:</p>
-              <div style="background:#0a0a0a; border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:24px; text-align:center; margin:30px 0;">
-                <span style="font-size:36px; font-weight:600; letter-spacing:8px; color:#ffffff;">{code}</span>
-              </div>
-              <p style="font-size:14px; color:#9ca3af; text-align:center;">Este código expira en 15 minutos</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+  <div style="text-align:center; padding: 40px;">
+    <h1 style="color:#ffffff;">Verifica tu cuenta</h1>
+    <p style="color:#d1d5db;">Tu código de acceso es:</p>
+    <div style="background:#1a1a1a; border:1px solid #333; border-radius:10px; padding:20px; font-size:32px; letter-spacing:5px; display:inline-block; margin:20px 0;">
+      {code}
+    </div>
+    <p style="font-size:12px; color:#666;">Expira en 15 minutos</p>
+  </div>
 </body>
 </html>
 """
@@ -72,29 +83,16 @@ def send_verification_email(to_email: str, code: str):
 
 
 def send_welcome_email(to_email: str, name: str):
+    logger.info(f"📝 [EMAIL] Preparando email de BIENVENIDA para {to_email}")
     subject = "¡Bienvenido a casa! · Residencial"
     html_content = f"""
 <!DOCTYPE html>
 <html lang="es">
 <body style="margin:0; padding:0; background-color:#0a0a0a; font-family:sans-serif; color:#ffffff;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0; background-color:#0a0a0a;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#111111; border-radius:20px; overflow:hidden;">
-          <tr>
-            <td style="padding:40px; text-align:center; background:linear-gradient(180deg, #0a0a0a 0%, #111111 100%);">
-              <h1 style="margin:20px 0 0; font-size:32px; font-weight:300;">Tu cuenta está<br><span style="font-weight:600; color:#4ade80;">Verificada</span></h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px;">
-              <p style="color:#d1d5db;">Hola <strong>{name}</strong>, ya tienes acceso total a la plataforma.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+  <div style="text-align:center; padding: 40px;">
+    <h1 style="color:#4ade80;">¡Cuenta Verificada!</h1>
+    <p style="color:#d1d5db;">Hola {name}, ya tienes acceso total a las instalaciones.</p>
+  </div>
 </body>
 </html>
 """
@@ -102,33 +100,19 @@ def send_welcome_email(to_email: str, name: str):
 
 
 def send_reset_password_email(to_email: str, code: str):
+    logger.info(f"📝 [EMAIL] Preparando email de RESET PASSWORD para {to_email}")
     subject = "Recuperación de Contraseña · Residencial"
     html_content = f"""
 <!DOCTYPE html>
 <html lang="es">
 <body style="margin:0; padding:0; background-color:#0a0a0a; font-family:sans-serif; color:#ffffff;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0; background-color:#0a0a0a;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#111111; border-radius:20px; border: 1px solid #7c3aed;">
-          <tr>
-            <td style="padding:40px; text-align:center;">
-              <h1 style="color:#a78bfa; margin:0;">Recuperar Acceso</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px;">
-              <p style="color:#d1d5db;">Has solicitado restablecer tu contraseña. Usa este código:</p>
-              <div style="background:#0a0a0a; border:1px solid #7c3aed; border-radius:16px; padding:24px; text-align:center; margin:30px 0;">
-                <span style="font-size:36px; font-weight:600; letter-spacing:8px; color:#a78bfa;">{code}</span>
-              </div>
-              <p style="font-size:12px; color:#6b7280; text-align:center;">Si no fuiste tú, ignora este mensaje.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+  <div style="text-align:center; padding: 40px;">
+    <h1 style="color:#a78bfa;">Recuperar Contraseña</h1>
+    <p style="color:#d1d5db;">Usa este código para cambiar tu clave:</p>
+    <div style="background:#1a1a1a; border:1px solid #7c3aed; border-radius:10px; padding:20px; font-size:32px; letter-spacing:5px; display:inline-block; margin:20px 0;">
+      {code}
+    </div>
+  </div>
 </body>
 </html>
 """
@@ -136,21 +120,28 @@ def send_reset_password_email(to_email: str, code: str):
 
 
 def send_support_email(data: dict):
-    # Este correo se envía AL ADMINISTRADOR
+    # CORREGIDO: Usamos MAIL_USERNAME para que llegue al correo del sistema
+    destinatario = settings.MAIL_USERNAME
+    logger.info(f"📝 [EMAIL] Preparando email de SOPORTE.")
+    logger.info(f"    - Origen: {data['email']}")
+    logger.info(f"    - Destino: {destinatario} (Admin/Sistema)")
+
     subject = f"Soporte: {data['subject']} - {data['name']}"
-    to_email = settings.MAIL_USERNAME
 
     html_content = f"""
 <!DOCTYPE html>
 <html>
 <body style="font-family:sans-serif;">
-    <h2>Nuevo mensaje de soporte</h2>
-    <p><strong>De:</strong> {data['name']} ({data['email']})</p>
-    <p><strong>Asunto:</strong> {data['subject']}</p>
+    <h2>Nuevo mensaje de soporte recibido</h2>
+    <ul>
+        <li><strong>Nombre:</strong> {data['name']}</li>
+        <li><strong>Email:</strong> {data['email']}</li>
+        <li><strong>Asunto:</strong> {data['subject']}</li>
+    </ul>
     <hr>
-    <p style="white-space: pre-wrap;">{data['message']}</p>
+    <h3>Mensaje:</h3>
+    <p style="white-space: pre-wrap; background-color: #f4f4f4; padding: 15px; border-radius: 5px;">{data['message']}</p>
 </body>
 </html>
 """
-    # Enviamos el correo al admin
-    return _send_email(to_email, subject, html_content)
+    return _send_email(destinatario, subject, html_content)

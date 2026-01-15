@@ -1,5 +1,5 @@
 import {useEffect, useState, useRef} from 'react';
-import {ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight, Loader2, RefreshCw} from 'lucide-react';
+import {ArrowDown, Lock, Calendar, Shield, Clock, ChevronLeft, ChevronRight, Loader2} from 'lucide-react';
 import {useNavigate} from 'react-router-dom';
 
 // Interfaz para los datos que vienen del Backend
@@ -40,6 +40,67 @@ const FACILITY_ASSETS: { [key: string]: { image: string, subtitle: string, specs
         subtitle: 'Event Space',
         specs: ['Capacidad 10 personas', 'Audio/Video', "Termostato regulable"]
     }
+};
+
+// Mapeo de nombres alternativos para mejor matching
+const FACILITY_NAME_MAP: { [key: string]: string[] } = {
+    'Padel Court 1': ['padel court 1', 'padel 1', 'pista padel 1', 'pista de padel 1', 'pádel court 1', 'pádel 1'],
+    'Padel Court 2': ['padel court 2', 'padel 2', 'pista padel 2', 'pista de padel 2', 'pádel court 2', 'pádel 2'],
+    'Piscina': ['piscina', 'pool', 'natación', 'swimming pool', 'piscina climatizada'],
+    'Gimnasio': ['gimnasio', 'gym', 'fitness', 'sala de musculación', 'sala de fitness'],
+    'Sauna': ['sauna', 'baño de vapor', 'steam room', 'sauna finlandesa']
+};
+
+// Función para normalizar texto (quitar tildes, convertir a minúsculas, eliminar espacios extra)
+const normalizeText = (text: string): string => {
+    return text
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar tildes
+        .trim()
+        .replace(/\s+/g, ' '); // Normalizar espacios
+};
+
+// Función para encontrar el asset correspondiente usando matching flexible
+const findFacilityAsset = (facilityName: string) => {
+    const normalizedInput = normalizeText(facilityName);
+
+    // Primero intentar matching exacto normalizado
+    for (const [key] of Object.entries(FACILITY_ASSETS)) {
+        if (normalizeText(key) === normalizedInput) {
+            return FACILITY_ASSETS[key];
+        }
+    }
+
+    // Buscar en el mapa de nombres alternativos
+    for (const [key, aliases] of Object.entries(FACILITY_NAME_MAP)) {
+        if (aliases.some(alias => normalizeText(alias) === normalizedInput)) {
+            return FACILITY_ASSETS[key];
+        }
+    }
+
+    // Buscar por palabras clave si no hay match exacto
+    if (normalizedInput.includes('padel') || normalizedInput.includes('pádel')) {
+        return FACILITY_ASSETS['Padel Court 1']; // O podemos retornar un padel genérico
+    }
+
+    if (normalizedInput.includes('piscina') || normalizedInput.includes('pool') || normalizedInput.includes('natacion')) {
+        return FACILITY_ASSETS['Piscina'];
+    }
+
+    if (normalizedInput.includes('gimnasio') || normalizedInput.includes('gym') || normalizedInput.includes('fitness')) {
+        return FACILITY_ASSETS['Gimnasio'];
+    }
+
+    if (normalizedInput.includes('sauna')) {
+        return FACILITY_ASSETS['Sauna'];
+    }
+
+    // Fallback a una imagen genérica
+    return {
+        image: '/images/comunidad_1.jpg',
+        subtitle: 'Instalación',
+        specs: ['Alta calidad']
+    };
 };
 
 // Constantes configurables para el polling
@@ -297,10 +358,17 @@ export default function LandingPage() {
         }
     };
 
-    // Helpers para obtener precios dinámicos en las secciones estáticas
-    const getPrice = (namePart: string) => {
-        const found = facilities.find(f => f.name.toLowerCase().includes(namePart.toLowerCase()));
-        return found ? `${found.price}€` : 'Consultar';
+    // Obtener el precio mínimo para un tipo de instalación (útil para "desde X€")
+    const getMinPriceForType = (typeKeywords: string[]) => {
+        const matchingFacilities = facilities.filter(fac => {
+            const normalizedName = normalizeText(fac.name);
+            return typeKeywords.some(keyword => normalizedName.includes(normalizeText(keyword)));
+        });
+
+        if (matchingFacilities.length === 0) return 'Consultar';
+
+        const minPrice = Math.min(...matchingFacilities.map(f => f.price));
+        return `${minPrice}€`;
     };
 
     return (
@@ -418,27 +486,13 @@ export default function LandingPage() {
                                     <button onClick={() => scrollCarousel('right')}
                                             className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white">
                                         <ChevronRight size={24}/></button>
-                                    <button onClick={() => fetchFacilities(false, true)}
-                                            className="glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white"
-                                            title="Actualizar ahora"
-                                            disabled={loading}>
-                                        {loading ? (
-                                            <Loader2 size={24} className="animate-spin"/>
-                                        ) : (
-                                            <RefreshCw size={24}/>
-                                        )}
-                                    </button>
                                 </div>
                             </div>
 
                             <div ref={carouselRef}
                                  className="carousel-container flex gap-6 pb-6 overflow-x-auto scrollbar-hide snap-x snap-mandatory">
                                 {facilities.map((fac) => {
-                                    const assets = FACILITY_ASSETS[fac.name] || {
-                                        image: '/images/comunidad_1.jpg',
-                                        subtitle: 'Instalación',
-                                        specs: ['Alta calidad']
-                                    };
+                                    const assets = findFacilityAsset(fac.name);
 
                                     return (
                                         <div key={fac.id}
@@ -523,7 +577,7 @@ export default function LandingPage() {
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                                     Precio desde: <span
-                                    className="text-cyan-400 font-semibold">{getPrice('Pádel')} / hora</span>
+                                    className="text-cyan-400 font-semibold">{getMinPriceForType(['padel', 'pádel'])} / hora</span>
                                     {isPollingActive }
                                 </li>
                                 <li className="flex items-center gap-3">
@@ -580,7 +634,7 @@ export default function LandingPage() {
                                 </li>
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Precio actual: <span className="text-cyan-400 font-semibold">{getPrice('Piscina')} / sesión</span>
+                                    Precio actual: <span className="text-cyan-400 font-semibold">{getMinPriceForType(['piscina', 'pool', 'natacion'])} / sesión</span>
                                     {isPollingActive}
                                 </li>
                                 <li className="flex items-center gap-3">
@@ -616,7 +670,7 @@ export default function LandingPage() {
                                 <li className="flex items-center gap-3">
                                     <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                                     Cuota de mantenimiento: <span
-                                    className="text-cyan-400 font-semibold">{getPrice('Gimnasio')} / uso</span>
+                                    className="text-cyan-400 font-semibold">{getMinPriceForType(['gimnasio', 'gym', 'fitness'])} / uso</span>
                                     {isPollingActive}
                                 </li>
                                 <li className="flex items-center gap-3">

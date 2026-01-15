@@ -57,11 +57,15 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('overview');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Estados de datos
+    // Estados de datos CON VALORES POR DEFECTO
     const [users, setUsers] = useState<UserData[]>([]);
     const [reservations, setReservations] = useState<ReservationData[]>([]);
     const [facilities, setFacilities] = useState<DashboardFacility[]>([]);
-    const [backendStats, setBackendStats] = useState<AdminStats | null>(null);
+    const [backendStats, setBackendStats] = useState<AdminStats>({
+        total_reservations: 0,
+        total_earnings: 0,
+        popular_facility: 'N/A'
+    });
 
     // Estado para la hora de la última actualización (Visual)
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -76,7 +80,7 @@ export default function AdminDashboard() {
     const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
     const [editForm, setEditForm] = useState({price: 0, capacity: 0});
 
-    // --- FUNCIÓN PURA DE OBTENCIÓN DE DATOS (Sin tocar loading) ---
+    // --- FUNCIÓN PURA DE OBTENCIÓN DE DATOS CON MANEJO ROBUSTO DE ERRORES ---
     const fetchAllData = useCallback(async () => {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -87,49 +91,129 @@ export default function AdminDashboard() {
         const headers = {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'};
 
         try {
-            // Peticiones en paralelo
-            const [statsRes, usersRes, resRes, facRes] = await Promise.all([
-                fetch('http://localhost:8000/api/v1/reservations/stats', {headers}),
-                fetch('http://localhost:8000/api/v1/users', {headers}),
-                fetch('http://localhost:8000/api/v1/reservations', {headers}),
-                fetch('http://localhost:8000/api/v1/reservations/facilities', {headers})
+            // Peticiones en paralelo con timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
+            const [statsRes, usersRes, resRes, facRes] = await Promise.allSettled([
+                fetch('http://localhost:8000/api/v1/reservations/stats', {headers, signal: controller.signal}),
+                fetch('http://localhost:8000/api/v1/users', {headers, signal: controller.signal}),
+                fetch('http://localhost:8000/api/v1/reservations', {headers, signal: controller.signal}),
+                fetch('http://localhost:8000/api/v1/reservations/facilities', {headers, signal: controller.signal})
             ]);
 
-            // Procesamos Stats
-            if (statsRes.ok) setBackendStats(await statsRes.json());
+            clearTimeout(timeoutId);
 
-            // Procesamos Usuarios
-            if (usersRes.ok) setUsers(await usersRes.json());
-
-            // Procesamos Reservas
-            let reservationsData: ReservationData[] = [];
-            if (resRes.ok) {
-                reservationsData = await resRes.json();
-                setReservations(reservationsData);
+            // Procesamos Stats con validación robusta
+            if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+                try {
+                    const statsData = await statsRes.value.json();
+                    setBackendStats({
+                        total_reservations: statsData.total_reservations || 0,
+                        total_earnings: Number(statsData.total_earnings) || 0,
+                        popular_facility: statsData.popular_facility || 'N/A'
+                    });
+                } catch (error) {
+                    console.warn("Error procesando estadísticas:", error);
+                    // Mantener valores por defecto
+                }
             }
 
-            // Procesamos Instalaciones
-            if (facRes.ok) {
-                const rawFacilities: Facility[] = await facRes.json();
-                const processedFacilities = rawFacilities.map(fac => {
-                    const facReservations = reservationsData.filter(r => r.facility === fac.name);
-                    const revenue = facReservations.reduce((acc, curr) => acc + (curr.price || 0), 0);
-                    const bookings = facReservations.length;
+            // Procesamos Usuarios con validación robusta
+            if (usersRes.status === 'fulfilled' && usersRes.value.ok) {
+                try {
+                    const usersData = await usersRes.value.json();
+                    // FILTRAR elementos null/undefined y asegurar estructura
+                    const validUsers = (Array.isArray(usersData) ? usersData : [])
+                        .filter(user => user != null && typeof user === 'object')
+                        .map(user => ({
+                            id: Number(user.id) || 0,
+                            full_name: String(user.full_name || 'Usuario Sin Nombre'),
+                            email: String(user.email || ''),
+                            apartment: String(user.apartment || 'N/A'),
+                            phone: user.phone ? String(user.phone) : undefined,
+                            role: String(user.role || 'user'),
+                            is_active: Boolean(user.is_active),
+                            created_at: String(user.created_at || new Date().toISOString()),
+                            avatar_url: user.avatar_url ? String(user.avatar_url) : undefined
+                        }));
+                    setUsers(validUsers);
+                } catch (error) {
+                    console.warn("Error procesando usuarios:", error);
+                    setUsers([]);
+                }
+            }
 
-                    let type = 'General';
-                    if (fac.name.includes('Pádel') || fac.name.includes('Gimnasio')) type = 'Deportiva';
-                    else if (fac.name.includes('Piscina') || fac.name.includes('Sauna')) type = 'Wellness';
-                    else if (fac.name.includes('Sala')) type = 'Social';
+            // Procesamos Reservas con validación robusta
+            let reservationsData: ReservationData[] = [];
+            if (resRes.status === 'fulfilled' && resRes.value.ok) {
+                try {
+                    const rawReservations = await resRes.value.json();
+                    // FILTRAR elementos null/undefined y asegurar estructura
+                    const validReservations = (Array.isArray(rawReservations) ? rawReservations : [])
+                        .filter(res => res != null && typeof res === 'object')
+                        .map(res => ({
+                            id: Number(res.id) || 0,
+                            facility: String(res.facility || 'Instalación Desconocida'),
+                            start_time: String(res.start_time || new Date().toISOString()),
+                            end_time: String(res.end_time || new Date().toISOString()),
+                            price: Number(res.price) || 0,
+                            user_id: Number(res.user_id) || 0,
+                            user: res.user && typeof res.user === 'object' ? {
+                                full_name: String(res.user.full_name || 'Usuario'),
+                                email: String(res.user.email || '')
+                            } : undefined,
+                            status: res.status ? String(res.status) : undefined
+                        }));
+                    reservationsData = validReservations;
+                    setReservations(validReservations);
+                } catch (error) {
+                    console.warn("Error procesando reservas:", error);
+                    setReservations([]);
+                }
+            }
 
-                    return {
-                        ...fac,
-                        revenue,
-                        bookings,
-                        type,
-                        occupancy: Math.min(100, Math.round(bookings * 2))
-                    };
-                });
-                setFacilities(processedFacilities);
+            // Procesamos Instalaciones con validación robusta
+            if (facRes.status === 'fulfilled' && facRes.value.ok) {
+                try {
+                    const rawFacilities = await facRes.value.json();
+                    // FILTRAR elementos null/undefined y asegurar estructura
+                    const validRawFacilities = (Array.isArray(rawFacilities) ? rawFacilities : [])
+                        .filter(fac => fac != null && typeof fac === 'object');
+
+                    const processedFacilities = validRawFacilities.map(fac => {
+                        const facReservations = reservationsData.filter(r =>
+                            r && r.facility === fac.name
+                        );
+                        const revenue = facReservations.reduce((acc, curr) =>
+                            acc + (Number(curr?.price) || 0), 0
+                        );
+                        const bookings = facReservations.length;
+
+                        let type = 'General';
+                        const name = String(fac.name || '');
+                        if (name.includes('Pádel') || name.includes('Gimnasio')) type = 'Deportiva';
+                        else if (name.includes('Piscina') || name.includes('Sauna')) type = 'Wellness';
+                        else if (name.includes('Sala')) type = 'Social';
+
+                        return {
+                            id: Number(fac.id) || 0,
+                            name: name,
+                            price: Number(fac.price) || 0,
+                            capacity: Number(fac.capacity) || 0,
+                            icon: fac.icon ? String(fac.icon) : undefined,
+                            color: fac.color ? String(fac.color) : undefined,
+                            revenue: revenue,
+                            bookings: bookings,
+                            type: type,
+                            occupancy: Math.min(100, Math.round(bookings * 2))
+                        };
+                    });
+                    setFacilities(processedFacilities);
+                } catch (error) {
+                    console.warn("Error procesando instalaciones:", error);
+                    setFacilities([]);
+                }
             }
 
             // Actualizamos la hora para dar feedback visual de que el polling funciona
@@ -137,6 +221,7 @@ export default function AdminDashboard() {
 
         } catch (error) {
             console.error("Error en polling:", error);
+            // No mostrar error al usuario para no interrumpir la experiencia
         }
     }, [navigate]);
 
@@ -164,12 +249,15 @@ export default function AdminDashboard() {
         };
     }, [fetchAllData]);
 
-    // --- Funciones auxiliares ---
-    const filteredUsers = users.filter(user =>
-        user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.apartment?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // --- Funciones auxiliares ROBUSTAS ---
+    const filteredUsers = users.filter(user => {
+        if (!user) return false;
+        const name = String(user.full_name || '').toLowerCase();
+        const email = String(user.email || '').toLowerCase();
+        const apartment = String(user.apartment || '').toLowerCase();
+        const query = searchQuery.toLowerCase();
+        return name.includes(query) || email.includes(query) || apartment.includes(query);
+    });
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -197,8 +285,12 @@ export default function AdminDashboard() {
     };
 
     const handleEditFacility = (facility: Facility) => {
+        if (!facility) return;
         setEditingFacility(facility);
-        setEditForm({price: facility.price, capacity: facility.capacity});
+        setEditForm({
+            price: Number(facility.price) || 0,
+            capacity: Number(facility.capacity) || 0
+        });
     };
 
     const handleSaveFacility = async () => {
@@ -224,15 +316,41 @@ export default function AdminDashboard() {
         }
     };
 
-    const formatDate = (dateString: string) => {
+    // Funciones de formato ROBUSTAS
+    const formatDate = (dateString: string): string => {
         if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('es-ES', {
-            day: 'numeric', month: 'short', year: 'numeric'
-        });
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Fecha inválida';
+            return date.toLocaleDateString('es-ES', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+        } catch {
+            return 'Fecha inválida';
+        }
     };
 
-    const formatTime = (dateString: string) => {
-        return new Date(dateString).toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
+    const formatTime = (dateString: string): string => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Hora inválida';
+            return date.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'});
+        } catch {
+            return 'Hora inválida';
+        }
+    };
+
+    // Función para formatear números de forma segura
+    const safeNumber = (value: any, defaultValue: number = 0): number => {
+        const num = Number(value);
+        return isNaN(num) ? defaultValue : num;
+    };
+
+    // Función para formatear moneda de forma segura
+    const safeCurrency = (value: any): string => {
+        const num = safeNumber(value, 0);
+        return `${num.toFixed(2)}€`;
     };
 
     // --- RENDER ---
@@ -349,7 +467,7 @@ export default function AdminDashboard() {
                                     <DollarSign className="text-purple-400" size={24}/>
                                 </div>
                                 <p className="text-gray-400 text-sm mb-1">Ingresos Totales</p>
-                                <p className="text-3xl font-light">{backendStats?.total_earnings.toFixed(2) || 0}€</p>
+                                <p className="text-3xl font-light">{safeCurrency(backendStats?.total_earnings)}</p>
                             </div>
                              <div className="glass p-6 rounded-2xl border border-white/10">
                                 <div className="w-12 h-12 bg-orange-500/20 rounded-xl flex items-center justify-center mb-4">
@@ -364,8 +482,11 @@ export default function AdminDashboard() {
                             <div className="lg:col-span-2 glass p-8 rounded-2xl border border-white/10">
                                 <h2 className="text-2xl font-light mb-6">Últimas Reservas</h2>
                                 <div className="space-y-3">
-                                    {reservations.slice(0, 5).map((res) => (
-                                        <div key={res.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition">
+                                    {Array.isArray(reservations) && reservations
+                                        .filter(res => res != null) // Filtro defensivo
+                                        .slice(0, 5)
+                                        .map((res) => (
+                                        <div key={res.id || `res-${Math.random()}`} className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white">
                                                     <Calendar size={16}/>
@@ -375,26 +496,42 @@ export default function AdminDashboard() {
                                                     <p className="text-sm text-gray-400">{res.facility} • {formatDate(res.start_time)} {formatTime(res.start_time)}</p>
                                                 </div>
                                             </div>
-                                            <span className="text-sm font-medium">{res.price.toFixed(2)}€</span>
+                                            <span className="text-sm font-medium">{safeCurrency(res.price)}</span>
                                         </div>
                                     ))}
-                                    {reservations.length === 0 && <p className="text-gray-500 text-center">No hay reservas recientes.</p>}
+                                    {(!reservations || reservations.length === 0) && (
+                                        <p className="text-gray-500 text-center">No hay reservas recientes.</p>
+                                    )}
                                 </div>
                             </div>
                             <div className="glass p-8 rounded-2xl border border-white/10">
                                 <h2 className="text-2xl font-light mb-6">Ingresos por Pista</h2>
                                 <div className="space-y-4">
-                                    {facilities.map((fac) => (
-                                        <div key={fac.id}>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-sm font-medium">{fac.name}</span>
-                                                <span className="text-sm text-gray-400">{fac.revenue.toFixed(2)}€</span>
-                                            </div>
-                                            <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                                                <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-full" style={{width: `${(fac.revenue / (backendStats?.total_earnings || 1)) * 100}%`}}></div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                    {Array.isArray(facilities) && facilities
+                                        .filter(fac => fac != null) // Filtro defensivo
+                                        .map((fac) => {
+                                            const revenue = safeNumber(fac.revenue);
+                                            const totalEarnings = safeNumber(backendStats?.total_earnings);
+                                            const percentage = totalEarnings > 0 ? (revenue / totalEarnings) * 100 : 0;
+
+                                            return (
+                                                <div key={fac.id || `fac-${Math.random()}`}>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-sm font-medium">{fac.name || 'Instalación'}</span>
+                                                        <span className="text-sm text-gray-400">{safeCurrency(revenue)}</span>
+                                                    </div>
+                                                    <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                                                        <div
+                                                            className="bg-gradient-to-r from-blue-500 to-purple-500 h-full"
+                                                            style={{width: `${Math.min(100, percentage)}%`}}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    {(!facilities || facilities.length === 0) && (
+                                        <p className="text-gray-500 text-center">No hay datos de instalaciones.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -406,7 +543,13 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-4 mb-6">
                             <div className="flex-1 relative">
                                 <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"/>
-                                <input type="text" placeholder="Buscar usuarios..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-12 pr-4 py-3 glass rounded-xl text-white focus:outline-none border border-white/10"/>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar usuarios..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-3 glass rounded-xl text-white focus:outline-none border border-white/10"
+                                />
                             </div>
                         </div>
                         <div className="glass rounded-2xl overflow-hidden border border-white/10">
@@ -420,31 +563,60 @@ export default function AdminDashboard() {
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {filteredUsers.map((user) => (
-                                    <tr key={user.id} className="border-b border-white/5 hover:bg-white/5 transition">
+                                {Array.isArray(filteredUsers) && filteredUsers
+                                    .filter(user => user != null) // Filtro defensivo adicional
+                                    .map((user) => (
+                                    <tr key={user.id || `user-${Math.random()}`} className="border-b border-white/5 hover:bg-white/5 transition">
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
                                                 {user.avatar_url ? (
-                                                    <img src={user.avatar_url} className="w-10 h-10 rounded-full object-cover"/>
-                                                ) : (
-                                                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-bold">
-                                                        {user.full_name?.charAt(0) || 'U'}
-                                                    </div>
-                                                )}
+                                                    <img
+                                                        src={user.avatar_url}
+                                                        className="w-10 h-10 rounded-full object-cover"
+                                                        alt={user.full_name}
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                                        }}
+                                                    />
+                                                ) : null}
+                                                <div className={`w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-sm font-bold ${user.avatar_url ? 'hidden' : ''}`}>
+                                                    {user.full_name?.charAt(0) || 'U'}
+                                                </div>
                                                 <div>
-                                                    <p className="font-medium">{user.full_name}</p>
-                                                    <p className="text-xs text-gray-500">{user.apartment}</p>
+                                                    <p className="font-medium">{user.full_name || 'Usuario'}</p>
+                                                    <p className="text-xs text-gray-500">{user.apartment || 'N/A'}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-4 text-gray-400 text-sm">{user.email}</td>
-                                        <td className="p-4 uppercase text-sm">{user.role}</td>
+                                        <td className="p-4 text-gray-400 text-sm">{user.email || 'N/A'}</td>
+                                        <td className="p-4 uppercase text-sm">{user.role || 'user'}</td>
                                         <td className="p-4 flex gap-2">
-                                            <button onClick={() => {setSelectedUser(user); setShowUserModal(true);}} className="p-2 hover:bg-white/10 rounded-lg transition"><Eye size={18}/></button>
-                                            <button onClick={() => handleDeleteUser(user.id)} className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition"><Trash2 size={18}/></button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedUser(user);
+                                                    setShowUserModal(true);
+                                                }}
+                                                className="p-2 hover:bg-white/10 rounded-lg transition"
+                                            >
+                                                <Eye size={18}/>
+                                            </button>
+                                            <button
+                                                onClick={() => user.id && handleDeleteUser(user.id)}
+                                                className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition"
+                                            >
+                                                <Trash2 size={18}/>
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
+                                {(!filteredUsers || filteredUsers.length === 0) && (
+                                    <tr>
+                                        <td colSpan={4} className="p-8 text-center text-gray-500">
+                                            {searchQuery ? 'No se encontraron usuarios con ese criterio' : 'No hay usuarios registrados'}
+                                        </td>
+                                    </tr>
+                                )}
                                 </tbody>
                             </table>
                         </div>
@@ -453,52 +625,76 @@ export default function AdminDashboard() {
 
                 {activeTab === 'reservations' && (
                     <div className="space-y-4">
-                        {reservations.map((res) => (
-                            <div key={res.id} className="glass p-6 rounded-2xl flex justify-between items-center border border-white/10 hover:bg-white/5 transition">
+                        {Array.isArray(reservations) && reservations
+                            .filter(res => res != null) // Filtro defensivo
+                            .map((res) => (
+                            <div key={res.id || `reservation-${Math.random()}`} className="glass p-6 rounded-2xl flex justify-between items-center border border-white/10 hover:bg-white/5 transition">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
                                         <Calendar size={20}/>
                                     </div>
                                     <div>
-                                        <h3 className="font-medium text-lg">{res.facility}</h3>
-                                        <p className="text-sm text-gray-400">{res.user?.full_name} • {formatDate(res.start_time)} {formatTime(res.start_time)}</p>
+                                        <h3 className="font-medium text-lg">{res.facility || 'Reserva'}</h3>
+                                        <p className="text-sm text-gray-400">
+                                            {res.user?.full_name || `Usuario #${res.user_id}`} • {formatDate(res.start_time)} {formatTime(res.start_time)}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <span className="block font-bold text-xl">{res.price.toFixed(2)}€</span>
-                                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">Confirmada</span>
+                                    <span className="block font-bold text-xl">{safeCurrency(res.price)}</span>
+                                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
+                                        {res.status === 'cancelled' ? 'Cancelada' : 'Confirmada'}
+                                    </span>
                                 </div>
                             </div>
                         ))}
+                        {(!reservations || reservations.length === 0) && (
+                            <div className="glass p-8 rounded-2xl border border-white/10 text-center">
+                                <p className="text-gray-500">No hay reservas para mostrar.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {activeTab === 'facilities' && (
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {facilities.map((fac) => (
-                            <div key={fac.id} className="glass p-6 rounded-2xl border border-white/10">
+                        {Array.isArray(facilities) && facilities
+                            .filter(fac => fac != null) // Filtro defensivo
+                            .map((fac) => (
+                            <div key={fac.id || `facility-${Math.random()}`} className="glass p-6 rounded-2xl border border-white/10">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-xl font-medium">{fac.name}</h3>
-                                    <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">{fac.type}</span>
+                                    <h3 className="text-xl font-medium">{fac.name || 'Instalación'}</h3>
+                                    <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">{fac.type || 'General'}</span>
                                 </div>
                                 <div className="space-y-3 mb-6">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-400">Precio hora</span>
-                                        <span className="font-bold">{fac.price}€</span>
+                                        <span className="font-bold">{safeNumber(fac.price)}€</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-400">Aforo máx</span>
-                                        <span className="font-bold">{fac.capacity} pers.</span>
+                                        <span className="font-bold">{safeNumber(fac.capacity)} pers.</span>
                                     </div>
                                     <div className="w-full bg-white/10 h-1 rounded-full mt-2">
-                                        <div className="bg-blue-500 h-1 rounded-full" style={{width: `${Math.min(100, fac.occupancy)}%`}}></div>
+                                        <div
+                                            className="bg-blue-500 h-1 rounded-full"
+                                            style={{width: `${Math.min(100, safeNumber(fac.occupancy))}%`}}
+                                        ></div>
                                     </div>
                                 </div>
-                                <button onClick={() => handleEditFacility(fac)} className="w-full py-3 bg-white text-black rounded-xl text-sm font-bold hover:bg-gray-200 transition flex items-center justify-center gap-2">
+                                <button
+                                    onClick={() => handleEditFacility(fac)}
+                                    className="w-full py-3 bg-white text-black rounded-xl text-sm font-bold hover:bg-gray-200 transition flex items-center justify-center gap-2"
+                                >
                                     <Edit size={16}/> Gestionar
                                 </button>
                             </div>
                         ))}
+                        {(!facilities || facilities.length === 0) && (
+                            <div className="md:col-span-2 lg:col-span-3 glass p-8 rounded-2xl border border-white/10 text-center">
+                                <p className="text-gray-500">No hay instalaciones disponibles.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -506,17 +702,22 @@ export default function AdminDashboard() {
                     <div className="glass p-8 rounded-2xl border border-white/10">
                         <h2 className="text-2xl font-light mb-6">Detalle de Ingresos</h2>
                         <div className="space-y-2">
-                            {facilities.filter(f => f.revenue > 0).map(fac => (
-                                <div key={fac.id} className="flex justify-between py-4 border-b border-white/5 items-center">
+                            {Array.isArray(facilities) && facilities
+                                .filter(fac => fac != null && safeNumber(fac.revenue) > 0)
+                                .map(fac => (
+                                <div key={fac.id || `revenue-${Math.random()}`} className="flex justify-between py-4 border-b border-white/5 items-center">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
                                             <DollarSign size={14}/>
                                         </div>
-                                        <span>{fac.name}</span>
+                                        <span>{fac.name || 'Instalación'}</span>
                                     </div>
-                                    <span className="text-xl font-light">{fac.revenue.toFixed(2)}€</span>
+                                    <span className="text-xl font-light">{safeCurrency(fac.revenue)}</span>
                                 </div>
                             ))}
+                            {(!facilities || facilities.filter(f => safeNumber(f?.revenue) > 0).length === 0) && (
+                                <p className="text-gray-500 text-center py-8">No hay ingresos registrados.</p>
+                            )}
                         </div>
                     </div>
                 )}
@@ -541,7 +742,14 @@ export default function AdminDashboard() {
                         <div className="space-y-4">
                             <div>
                                 <label className="text-sm text-gray-400 block mb-2">Precio (€/hora)</label>
-                                <input type="number" value={editForm.price} onChange={e => setEditForm({...editForm, price: parseFloat(e.target.value)})} className="w-full p-3 glass rounded-xl text-white outline-none focus:border-blue-500 border border-white/10"/>
+                                <input
+                                    type="number"
+                                    value={editForm.price}
+                                    onChange={e => setEditForm({...editForm, price: safeNumber(e.target.value, 0)})}
+                                    className="w-full p-3 glass rounded-xl text-white outline-none focus:border-blue-500 border border-white/10"
+                                    min="0"
+                                    step="0.5"
+                                />
                             </div>
                         </div>
                         <div className="flex justify-end gap-3 mt-8">
@@ -564,22 +772,22 @@ export default function AdminDashboard() {
 
                         <div className="flex items-center gap-4 mb-8">
                             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-2xl font-bold">
-                                {selectedUser.full_name.charAt(0)}
+                                {selectedUser.full_name?.charAt(0) || 'U'}
                             </div>
                             <div>
-                                <h3 className="text-xl font-medium">{selectedUser.full_name}</h3>
-                                <p className="text-gray-400">{selectedUser.email}</p>
+                                <h3 className="text-xl font-medium">{selectedUser.full_name || 'Usuario'}</h3>
+                                <p className="text-gray-400">{selectedUser.email || 'Sin email'}</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mb-8">
                             <div className="p-4 bg-white/5 rounded-xl">
                                 <p className="text-xs text-gray-500 uppercase mb-1">Apartamento</p>
-                                <p className="font-medium">{selectedUser.apartment}</p>
+                                <p className="font-medium">{selectedUser.apartment || 'N/A'}</p>
                             </div>
                             <div className="p-4 bg-white/5 rounded-xl">
                                 <p className="text-xs text-gray-500 uppercase mb-1">Rol</p>
-                                <p className="font-medium uppercase">{selectedUser.role}</p>
+                                <p className="font-medium uppercase">{selectedUser.role || 'user'}</p>
                             </div>
                             <div className="p-4 bg-white/5 rounded-xl">
                                 <p className="text-xs text-gray-500 uppercase mb-1">Estado</p>

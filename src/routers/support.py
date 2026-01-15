@@ -1,6 +1,10 @@
-from fastapi import APIRouter, HTTPException
-from src.services.email import send_support_email
+import logging
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, EmailStr
+from src.services.email import send_support_email
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -13,13 +17,14 @@ class SupportSchema(BaseModel):
 
 
 @router.post("/contact")
-def contact_support(form: SupportSchema):
+def contact_support(form: SupportSchema, background_tasks: BackgroundTasks):
     """
-    Recibe el formulario de contacto y envía un email al admin.
+    Recibe el formulario de contacto del frontend y envía un email al administrador.
     """
-    sent = send_support_email(form.dict())
+    logger.info(f"📨 [SOPORTE] Recibida solicitud de contacto.")
+    logger.info(f"    - De: {form.name} <{form.email}>")
+    logger.info(f"    - Asunto: {form.subject}")
 
-    if not sent:
-        raise HTTPException(status_code=500, detail="Error al enviar el mensaje de soporte")
+    background_tasks.add_task(send_support_email, form.dict())
 
     return {"message": "Mensaje enviado al equipo de soporte"}
