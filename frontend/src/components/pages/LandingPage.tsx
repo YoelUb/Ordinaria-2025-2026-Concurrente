@@ -462,11 +462,6 @@ export default function LandingPage() {
                             <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight">Todos los servicios.<br/><span
                                 className="font-semibold">A tu alcance.</span></h2>
                         </div>
-                        <div className="hidden md:flex items-center gap-3 text-sm text-gray-300">
-                            <div
-                                className={`w-2 h-2 rounded-full ${isPollingActive ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}/>
-                            <span>Actualización cada 4s</span>
-                        </div>
                     </div>
 
                     {loading && facilities.length === 0 ? (
@@ -559,133 +554,218 @@ export default function LandingPage() {
             </section>
 
             {/* SECCIÓN PÁDEL - PRECIOS DINÁMICOS */}
-            <section id="facilities" className="relative h-[200vh]">
+            <section id="facilities" className="relative min-h-[200vh] md:h-[200vh]">
                 <div className="sticky top-0 h-screen flex items-center justify-center px-6">
-                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
-                        <div style={{
+                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
+                        {/* Columna de texto */}
+                        <div className="space-y-6 md:space-y-8 pr-0 md:pr-8" style={{
                             opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 300)),
-                            transform: `translateX(${Math.max(-50, -50 + (scrollY - 1500) / 10)}px)`
+                            transform: `translateX(${Math.max(-20, -20 + (scrollY - 1500) / 15)}px)`
                         }}>
-                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Deporte
-                                Premium</p>
-                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight text-white">Pistas de<br/><span
-                                className="font-semibold">Pádel</span></h2>
-                            <p className="text-xl text-gray-300 mb-8 leading-relaxed font-light">Tres pistas
-                                profesionales con iluminación LED de última generación. Superficie de juego premium y
-                                sistema de reserva inteligente.</p>
-                            <ul className="space-y-3 text-gray-300">
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Precio desde: <span
-                                    className="text-cyan-400 font-semibold">{getMinPriceForType(['padel', 'pádel'])} / hora</span>
-                                    {isPollingActive }
+                            <div>
+                                <p className="text-sm tracking-[0.3em] text-gray-300 mb-3 uppercase font-medium">
+                                    Deporte Premium
+                                </p>
+                                <h2 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-light mb-4 md:mb-6 leading-tight text-white">
+                                    Pistas de<br/><span className="font-semibold">Pádel</span>
+                                </h2>
+                            </div>
+
+                            <p className="text-lg md:text-xl text-gray-300 leading-relaxed font-light max-w-lg">
+                                Tres pistas profesionales con iluminación LED de última generación.
+                                Superficie de juego premium y sistema de reserva inteligente.
+                            </p>
+
+                            <ul className="space-y-3 md:space-y-4 text-gray-300">
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <div>
+                                        <span className="font-medium">Precio desde: </span>
+                                        <span className="text-cyan-400 font-semibold">
+                                            {getMinPriceForType(['padel', 'pádel'])} / hora
+                                        </span>
+                                        {isPollingActive}
+                                    </div>
                                 </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Reserva por horas o franjas
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Reserva por horas o franjas horarias flexibles</span>
                                 </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Máximo 4 jugadores por reserva
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Máximo 4 jugadores por reserva con sistema de invitados</span>
+                                </li>
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Equipamiento incluido: palas y pelotas de calidad</span>
                                 </li>
                             </ul>
+
+                            <button onClick={handleReserveAction}
+                                    className="mt-4 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-full text-sm font-medium transition cursor-pointer border border-white/20">
+                                Reservar ahora →
+                            </button>
                         </div>
-                        <div className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl" style={{
+
+                        {/* Columna de imagen */}
+                        <div className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl mt-8 md:mt-0" style={{
                             transform: `scale(${0.8 + Math.min(0.2, (scrollY - 1500) / 1500)})`,
                             opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 400))
                         }}>
-                            <img src="/images/padel_3.jpg" alt="Padel" className="w-full h-full object-cover"
+                            <img src="/images/padel_3.jpg" alt="Padel"
+                                 className="w-full h-full object-cover"
                                  loading="lazy"/>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            {/* Etiqueta en la imagen */}
+                            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+                                <p className="text-sm font-medium text-white">Pista Principal</p>
+                                <p className="text-xs text-gray-300">Iluminación LED Pro</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </section>
 
             {/* SECCIÓN PISCINA - PRECIOS DINÁMICOS */}
-            <section className="relative h-[200vh] bg-gradient-to-b from-black to-gray-950">
+            <section className="relative min-h-[200vh] md:h-[200vh] bg-gradient-to-b from-black to-gray-950">
                 <div className="sticky top-0 h-screen flex items-center justify-center px-6">
-                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
-                        <div
-                            className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl order-2 md:order-1"
-                            style={{
-                                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
-                                opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
-                            }}>
-                            <img src="/images/piscina_2.jpg" alt="Pool" className="w-full h-full object-cover"
-                                 loading="lazy"/>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
-                        </div>
-                        <div className="order-1 md:order-2" style={{
-                            opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 300)),
-                            transform: `translateX(${Math.min(50, 50 - (scrollY - 2500) / 10)}px)`
+                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
+                        {/* Columna de imagen */}
+                        <div className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl" style={{
+                            transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
+                            opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
                         }}>
-                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Wellness &
-                                Relax</p>
-                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight text-white">Piscina<br/><span
-                                className="font-semibold">Climatizada</span></h2>
-                            <p className="text-xl text-gray-300 mb-8 leading-relaxed font-light">Disfruta todo el año de
-                                nuestra piscina climatizada con tecnología de purificación salina y control de aforo
-                                inteligente.</p>
-                            <ul className="space-y-3 text-gray-300">
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Temperatura constante 28°C
+                            <img src="/images/piscina_2.jpg" alt="Pool"
+                                 className="w-full h-full object-cover"
+                                 loading="lazy"/>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+                                <p className="text-sm font-medium text-white">Wellness Center</p>
+                                <p className="text-xs text-gray-300">28°C constante</p>
+                            </div>
+                        </div>
+
+                        {/* Columna de texto */}
+                        <div className="space-y-6 md:space-y-8 pl-0 md:pl-8" style={{
+                            opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 300)),
+                            transform: `translateX(${Math.min(20, 20 - (scrollY - 2500) / 15)}px)`
+                        }}>
+                            <div>
+                                <p className="text-sm tracking-[0.3em] text-gray-300 mb-3 uppercase font-medium">
+                                    Wellness & Relax
+                                </p>
+                                <h2 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-light mb-4 md:mb-6 leading-tight text-white">
+                                    Piscina<br/><span className="font-semibold">Climatizada</span>
+                                </h2>
+                            </div>
+
+                            <p className="text-lg md:text-xl text-gray-300 leading-relaxed font-light max-w-lg">
+                                Disfruta todo el año de nuestra piscina climatizada con tecnología
+                                de purificación salina y control de aforo inteligente.
+                            </p>
+
+                            <ul className="space-y-3 md:space-y-4 text-gray-300">
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Temperatura constante 28°C con sistema solar</span>
                                 </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Precio actual: <span className="text-cyan-400 font-semibold">{getMinPriceForType(['piscina', 'pool', 'natacion'])} / sesión</span>
-                                    {isPollingActive}
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <div>
+                                        <span className="font-medium">Precio actual: </span>
+                                        <span className="text-cyan-400 font-semibold">
+                                            {getMinPriceForType(['piscina', 'pool', 'natacion'])} / sesión
+                                        </span>
+                                        {isPollingActive}
+                                    </div>
                                 </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Reserva por turnos de 90 minutos
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Reserva por turnos de 90 minutos con jacuzzi incluido</span>
+                                </li>
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Vestuarios con taquillas inteligentes y secadores Dyson</span>
                                 </li>
                             </ul>
+
+                            <button onClick={handleReserveAction}
+                                    className="mt-4 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-full text-sm font-medium transition cursor-pointer border border-white/20">
+                                Ver horarios →
+                            </button>
                         </div>
                     </div>
                 </div>
             </section>
 
             {/* SECCIÓN GIMNASIO - PRECIOS DINÁMICOS */}
-            <section className="relative h-[200vh] bg-gradient-to-b from-gray-950 to-black">
+            <section className="relative min-h-[200vh] md:h-[200vh] bg-gradient-to-b from-gray-950 to-black">
                 <div className="sticky top-0 h-screen flex items-center justify-center px-6">
-                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
-                        <div style={{
+                    <div className="max-w-7xl w-full grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
+                        {/* Columna de texto */}
+                        <div className="space-y-6 md:space-y-8 pr-0 md:pr-8 order-2 md:order-1" style={{
                             opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 300)),
-                            transform: `translateX(${Math.max(-50, -50 + (scrollY - 3500) / 10)}px)`
+                            transform: `translateX(${Math.max(-20, -20 + (scrollY - 3500) / 15)}px)`
                         }}>
-                            <p className="text-sm tracking-[0.3em] text-gray-300 mb-4 uppercase font-medium">Fitness &
-                                Training</p>
-                            <h2 className="text-5xl md:text-7xl font-light mb-6 leading-tight text-white">Gimnasio<br/><span
-                                className="font-semibold">Completo</span></h2>
-                            <p className="text-xl text-gray-300 mb-8 leading-relaxed font-light">Equipamiento de última
-                                generación en un espacio diseñado para tu bienestar. Mancuernas, máquinas
-                                cardiovasculares y zona de estiramientos.</p>
-                            <ul className="space-y-3 text-gray-300">
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Acceso 24/7 para residentes
+                            <div>
+                                <p className="text-sm tracking-[0.3em] text-gray-300 mb-3 uppercase font-medium">
+                                    Fitness & Training
+                                </p>
+                                <h2 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-light mb-4 md:mb-6 leading-tight text-white">
+                                    Gimnasio<br/><span className="font-semibold">Completo</span>
+                                </h2>
+                            </div>
+
+                            <p className="text-lg md:text-xl text-gray-300 leading-relaxed font-light max-w-lg">
+                                Equipamiento de última generación en un espacio diseñado para tu bienestar.
+                                Mancuernas, máquinas cardiovasculares y zona de estiramientos.
+                            </p>
+
+                            <ul className="space-y-3 md:space-y-4 text-gray-300">
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Acceso 24/7 para residentes con control biométrico</span>
                                 </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Cuota de mantenimiento: <span
-                                    className="text-cyan-400 font-semibold">{getMinPriceForType(['gimnasio', 'gym', 'fitness'])} / uso</span>
-                                    {isPollingActive}
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <div>
+                                        <span className="font-medium">Cuota de mantenimiento: </span>
+                                        <span className="text-cyan-400 font-semibold">
+                                            {getMinPriceForType(['gimnasio', 'gym', 'fitness'])} / uso
+                                        </span>
+                                        {isPollingActive}
+                                    </div>
                                 </li>
-                                <li className="flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-                                    Ventilación y climatización óptima
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Ventilación y climatización óptima con filtro HEPA</span>
+                                </li>
+                                <li className="flex items-start gap-3">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></div>
+                                    <span>Entrenadores virtuales y rutinas personalizadas</span>
                                 </li>
                             </ul>
+
+                            <button onClick={handleReserveAction}
+                                    className="mt-4 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-full text-sm font-medium transition cursor-pointer border border-white/20">
+                                Ver disponibilidad →
+                            </button>
                         </div>
-                        <div className="relative h-[500px] md:h-[600px] rounded-2xl overflow-hidden shadow-2xl" style={{
+
+                        {/* Columna de imagen */}
+                        <div className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl order-1 md:order-2" style={{
                             transform: `scale(${0.8 + Math.min(0.2, (scrollY - 3500) / 1500)})`,
                             opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 400))
                         }}>
-                            <img src="/images/gym_3.jpg" alt="Gym" className="w-full h-full object-cover"
+                            <img src="/images/gym_3.jpg" alt="Gym"
+                                 className="w-full h-full object-cover"
                                  loading="lazy"/>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            {/* Etiqueta en la imagen */}
+                            <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
+                                <p className="text-sm font-medium text-white">Área Cardio</p>
+                                <p className="text-xs text-gray-300">Equipamiento Technogym</p>
+                            </div>
                         </div>
                     </div>
                 </div>
