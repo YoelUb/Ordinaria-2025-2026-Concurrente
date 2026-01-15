@@ -3,9 +3,8 @@ from typing import Optional
 from datetime import datetime
 import re
 
-# --- Reglas de validación (Regex) ---
+# --- Reglas de validación ---
 PHONE_REGEX = r'^\+?[0-9]{9,15}$'
-PASSWORD_REGEX = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d\W]{8,}$'
 
 
 class UserBase(BaseModel):
@@ -36,11 +35,18 @@ class UserCreate(UserBase):
     @field_validator('password')
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if not re.match(PASSWORD_REGEX, v):
-            raise ValueError(
-                'La contraseña es débil: requiere mín. 8 caracteres, '
-                '1 mayúscula, 1 minúscula y 1 número.'
-            )
+        # Validar longitud
+        if len(v) < 8:
+            raise ValueError('La contraseña debe tener al menos 8 caracteres.')
+
+        # Validar complejidad una por una (Más seguro que un solo Regex complejo)
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('La contraseña debe contener al menos una mayúscula.')
+        if not re.search(r'[a-z]', v):
+            raise ValueError('La contraseña debe contener al menos una minúscula.')
+        if not re.search(r'\d', v):
+            raise ValueError('La contraseña debe contener al menos un número.')
+
         return v
 
 
@@ -67,7 +73,6 @@ class UserResponse(UserBase):
     id: int
     created_at: datetime
     avatar_url: Optional[str] = None
-
 
     class Config:
         from_attributes = True

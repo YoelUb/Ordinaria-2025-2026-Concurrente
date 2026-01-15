@@ -33,6 +33,8 @@ def upgrade() -> None:
                     sa.Column('is_superuser', sa.Boolean(), nullable=True),
                     sa.Column('verification_code', sa.String(), nullable=True),
                     sa.Column('verification_code_expires_at', sa.DateTime(timezone=True), nullable=True),
+                    sa.Column('reset_password_code', sa.String(), nullable=True),
+                    sa.Column('reset_password_code_expires_at', sa.DateTime(timezone=True), nullable=True),
                     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
                     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
                     sa.PrimaryKeyConstraint('id')

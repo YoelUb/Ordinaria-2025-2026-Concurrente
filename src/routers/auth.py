@@ -1,5 +1,4 @@
 import random
-import time
 import string
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
@@ -15,9 +14,6 @@ from src.services.firebase import verify_id_token
 from src.services.email import send_verification_email, send_reset_password_email
 
 router = APIRouter()
-
-# --- ALMACENAMIENTO TEMPORAL DE CÓDIGOS DE RESETEO ---
-RESET_CODES = {}
 
 
 # --- SCHEMAS ---
@@ -90,7 +86,6 @@ def social_login(schema: SocialLoginSchema, db: Session = Depends(get_db)):
             hashed_password=get_password_hash("social_login_pass"),
             is_active=True
         )
-        # --- ESTO FALTABA EN TU CÓDIGO ---
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
@@ -147,25 +142,25 @@ def resend_verification(
     return {"message": "Código reenviado"}
 
 
-# --- RESETEO DE CONTRASEÑA ---
 
 @router.post("/forgot-password")
 def forgot_password(schema: ForgotPasswordSchema, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
-    Inicia el proceso de recuperación. Genera un código y lo envía por email.
+    Inicia el proceso de recuperación. Genera un código, lo guarda en la BD y lo envía por email.
     """
     user = db.query(User).filter(User.email == schema.email).first()
 
-    # Generamos código siempre para no revelar existencia de usuario (Seguridad)
     code = ''.join(random.choices(string.digits, k=6))
 
     if user:
-        # Guardar en memoria con expiración de 15 min (900 seg)
-        RESET_CODES[schema.email] = {
-            "code": code,
-            "exp": time.time() + 900
-        }
-        # Enviar email real en segundo plano
+        # Guardar en la Base de Datos con expiración de 15 min
+        user.reset_password_code = code
+        user.reset_password_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
+        # Commit para persistir el código aunque se reinicie el servidor
+        db.commit()
+
+        # Enviar email en segundo plano
         background_tasks.add_task(send_reset_password_email, schema.email, code)
 
     return {"message": "Si el correo existe, se ha enviado un código."}
@@ -174,32 +169,33 @@ def forgot_password(schema: ForgotPasswordSchema, background_tasks: BackgroundTa
 @router.post("/reset-password")
 def reset_password(schema: ResetPasswordSchema, db: Session = Depends(get_db)):
     """
-    Verifica el código y cambia la contraseña.
+    Verifica el código desde la BD y cambia la contraseña.
     """
-    # Verificar si hay código pendiente en memoria
-    record = RESET_CODES.get(schema.email)
+    user = db.query(User).filter(User.email == schema.email).first()
 
-    if not record:
+    # Verificar si el usuario existe y tiene un código activo
+    if not user or not user.reset_password_code:
         raise HTTPException(status_code=400, detail="Solicitud no encontrada o expirada")
 
     # Verificar expiración
-    if time.time() > record["exp"]:
-        del RESET_CODES[schema.email]
+    if datetime.now(timezone.utc) > user.reset_password_code_expires_at:
+        # Limpiar el código expirado
+        user.reset_password_code = None
+        user.reset_password_code_expires_at = None
+        db.commit()
         raise HTTPException(status_code=400, detail="El código ha expirado")
 
     # Verificar coincidencia del código
-    if record["code"] != schema.code:
+    if user.reset_password_code != schema.code:
         raise HTTPException(status_code=400, detail="Código incorrecto")
 
     # Actualizar contraseña en BD
-    user = db.query(User).filter(User.email == schema.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-
     user.hashed_password = get_password_hash(schema.new_password)
-    db.commit()
 
-    # Limpiar código usado
-    del RESET_CODES[schema.email]
+    # Limpiar código usado para que no se pueda reusar
+    user.reset_password_code = None
+    user.reset_password_code_expires_at = None
+
+    db.commit()
 
     return {"message": "Contraseña actualizada correctamente"}

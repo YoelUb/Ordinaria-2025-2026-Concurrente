@@ -544,7 +544,6 @@ export default function AdminDashboard() {
                                          </div>
                                          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
                                              <div className="text-right">
-                                                 <p className="text-lg font-light text-white">{safeCurrency(res.price)}</p>
                                                  <p className="text-xs text-green-400">Confirmada</p>
                                              </div>
                                          </div>
@@ -624,15 +623,6 @@ export default function AdminDashboard() {
                                     type="number"
                                     value={editForm.price}
                                     onChange={e => setEditForm({...editForm, price: Number(e.target.value)})}
-                                    className="w-full bg-white/5 border border-white/10 rounded p-2 text-white focus:border-blue-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-gray-400 mb-1">Capacidad Máxima</label>
-                                <input
-                                    type="number"
-                                    value={editForm.capacity}
-                                    onChange={e => setEditForm({...editForm, capacity: Number(e.target.value)})}
                                     className="w-full bg-white/5 border border-white/10 rounded p-2 text-white focus:border-blue-500 outline-none"
                                 />
                             </div>
