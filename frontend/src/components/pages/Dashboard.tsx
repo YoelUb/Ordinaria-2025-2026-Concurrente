@@ -107,6 +107,12 @@ const StatusBadge = ({ status }: { status?: string }) => {
     );
 };
 
+// Función auxiliar para convertir hora a minutos
+const timeToMinutes = (timeStr: string): number => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
 export default function Dashboard() {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('home');
@@ -364,7 +370,38 @@ export default function Dashboard() {
         return () => clearInterval(interval);
     }, [newResFacility, newResDate, showReserveModal, facilitiesConfig]);
 
-    // --- 4. Autocompletado Dirección ---
+    // --- 4. Función para verificar si el usuario ya tiene reserva en un horario ---
+    const userAlreadyHasReservation = useCallback((slotTime: string): boolean => {
+        if (!reservations.length) return false;
+
+        const selectedDate = new Date(newResDate);
+        const selectedTime = timeToMinutes(slotTime);
+
+        // Verificar si el usuario ya tiene una reserva en la misma instalación y fecha
+        return reservations.some(reservation => {
+            const resDate = new Date(reservation.start_time);
+            const resTime = timeToMinutes(
+                `${String(resDate.getHours()).padStart(2, '0')}:${String(resDate.getMinutes()).padStart(2, '0')}`
+            );
+
+            // Misma fecha (solo día, mes y año)
+            const sameDate =
+                resDate.getFullYear() === selectedDate.getFullYear() &&
+                resDate.getMonth() === selectedDate.getMonth() &&
+                resDate.getDate() === selectedDate.getDate();
+
+            // Misma instalación
+            const sameFacility = reservation.facility === newResFacility;
+
+            // Mismo horario (con margen de ±90 minutos para evitar solapamientos)
+            const timeDifference = Math.abs(resTime - selectedTime);
+            const sameTimeSlot = timeDifference < 90; // Menos de 1.5 horas de diferencia
+
+            return sameDate && sameFacility && sameTimeSlot;
+        });
+    }, [reservations, newResDate, newResFacility]);
+
+    // --- 5. Autocompletado Dirección ---
     useEffect(() => {
         if (profileForm.address.length < 3 || !showAddressMenu) {
             setAddressSuggestions([]);
@@ -384,7 +421,7 @@ export default function Dashboard() {
         return () => clearTimeout(timeoutId);
     }, [profileForm.address, showAddressMenu]);
 
-    // --- 5. Manejar clicks fuera de elementos ---
+    // --- 6. Manejar clicks fuera de elementos ---
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -435,7 +472,7 @@ export default function Dashboard() {
         setShowAddressMenu(false);
     };
 
-    // --- 6. Avatar (MinIO) ---
+    // --- 7. Avatar (MinIO) ---
     const triggerFileInput = (ref: React.RefObject<HTMLInputElement>) => {
         ref.current?.click();
     };
@@ -480,7 +517,7 @@ export default function Dashboard() {
         }
     };
 
-    // --- 7. BORRAR RESERVA ---
+    // --- 8. BORRAR RESERVA ---
     const handleDeleteReservation = async (reservationId: number) => {
         setDeletingReservation(true);
         const loadingToast = toast.loading("Eliminando reserva...");
@@ -516,7 +553,7 @@ export default function Dashboard() {
         }
     };
 
-    // --- 8. BORRAR CUENTA ---
+    // --- 9. BORRAR CUENTA ---
     const handleDeleteAccount = async () => {
         setDeletingAccount(true);
         const loadingToast = toast.loading("Eliminando cuenta...");
@@ -549,7 +586,7 @@ export default function Dashboard() {
         }
     };
 
-    // --- 9. Buscador ---
+    // --- 10. Buscador ---
     const filteredReservations = reservations.filter(res => {
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
@@ -642,6 +679,12 @@ export default function Dashboard() {
 
         if (selectedDate < today) {
             toast.error("No se pueden reservar fechas pasadas");
+            return;
+        }
+
+        // VERIFICAR SI EL USUARIO YA TIENE RESERVA EN ESE HORARIO
+        if (userAlreadyHasReservation(selectedTimeSlot)) {
+            toast.error("Ya tienes una reserva en este horario para esta instalación");
             return;
         }
 
@@ -1217,20 +1260,22 @@ export default function Dashboard() {
                                             const isFull = currentCount >= currentCapacity;
                                             const available = currentCapacity - currentCount;
                                             const isSelected = selectedTimeSlot === slot;
+                                            const userAlreadyBooked = userAlreadyHasReservation(slot);
 
                                             // Colores según ocupación
                                             let occupancyColor = isDarkMode ? 'text-green-400' : 'text-green-600';
                                             if (isFull) occupancyColor = 'text-red-500';
                                             else if (currentCount > 0) occupancyColor = isDarkMode ? 'text-amber-400' : 'text-amber-600';
+                                            else if (userAlreadyBooked) occupancyColor = 'text-purple-500';
 
                                             return (
                                                 <button
                                                     key={slot}
-                                                    disabled={isFull}
+                                                    disabled={isFull || userAlreadyBooked}
                                                     onClick={() => setSelectedTimeSlot(slot)}
                                                     className={`
                                                         py-3 rounded-xl border transition flex flex-col items-center justify-center gap-1 cursor-pointer text-sm relative overflow-hidden
-                                                        ${isFull
+                                                        ${isFull || userAlreadyBooked
                                                         ? 'bg-red-500/10 border-red-500/30 opacity-60 cursor-not-allowed'
                                                         : isSelected
                                                             ? (isDarkMode ? 'bg-white text-black border-white' : 'bg-gray-900 text-white border-gray-900')
@@ -1242,7 +1287,7 @@ export default function Dashboard() {
 
                                                     {/* Indicador de ocupación */}
                                                     <span className={`text-[10px] font-semibold ${isSelected ? (isDarkMode ? 'text-gray-600' : 'text-gray-300') : occupancyColor}`}>
-                                                        {isFull ? 'COMPLETO' : `${available} disponible${available !== 1 ? 's' : ''}`}
+                                                        {userAlreadyBooked ? 'YA RESERVADO' : (isFull ? 'COMPLETO' : `${available} disponible${available !== 1 ? 's' : ''}`)}
                                                     </span>
 
                                                     {/* Detalle numérico (1/1) */}
@@ -1263,7 +1308,9 @@ export default function Dashboard() {
                                 </button>
                                 <button
                                     onClick={handleCreateReservation}
-                                    disabled={!selectedTimeSlot || (slotAvailability[selectedTimeSlot || '']?.count || 0) >= (slotAvailability[selectedTimeSlot || '']?.capacity || facilitiesConfig[newResFacility]?.capacity || 1)}
+                                    disabled={!selectedTimeSlot ||
+                                        (slotAvailability[selectedTimeSlot || '']?.count || 0) >= (slotAvailability[selectedTimeSlot || '']?.capacity || facilitiesConfig[newResFacility]?.capacity || 1) ||
+                                        userAlreadyHasReservation(selectedTimeSlot)}
                                     className={`flex-1 py-3 rounded-lg font-medium transition cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                                 >
                                     Ir al Pago ({facilitiesConfig[newResFacility]?.price || 15.00}€)
