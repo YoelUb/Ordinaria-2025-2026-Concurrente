@@ -48,7 +48,7 @@ export default function LandingPage() {
         }
     };
 
-    // --- SERVICIOS (Sin Zona Infantil) ---
+    // --- SERVICIOS  ---
     const services = [
         {
             id: 1,
@@ -72,7 +72,7 @@ export default function LandingPage() {
             subtitle: 'Wellness Center',
             image: '/images/piscina_3.jpg',
             specs: ['28°C constante', 'Sistema salino', 'Solárium'],
-            price: 'Acceso incluido'
+            price: 'Desde 8€/hora'
         },
         {
             id: 4,
@@ -80,15 +80,15 @@ export default function LandingPage() {
             subtitle: 'Fitness Studio',
             image: '/images/gym_1.jpg',
             specs: ['24/7 Access', 'Equipamiento Pro', 'A/C'],
-            price: 'Acceso incluido'
+            price: 'Desde 5€/hora'
         },
         {
             id: 5,
-            title: 'Sala Común',
+            title: 'Sauna',
             subtitle: 'Event Space',
-            image: '/images/comunidad_4.jpg',
-            specs: ['Capacidad 50p', 'A/V System', 'Catering'],
-            price: 'Bajo reserva'
+            image: '/images/sauna.jpg',
+            specs: ['Capacidad 10 personas', 'Sistema de audio y video'],
+            price: 'Desde 10€/hora'
         }
     ];
 
