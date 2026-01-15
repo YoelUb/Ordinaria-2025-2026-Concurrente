@@ -77,7 +77,13 @@ def get_availability(facility: str, date_str: str, db: Session = Depends(get_db)
         func.date(Reservation.start_time) == search_date
     ).all()
 
-    return [{"start": r.start_time.strftime("%H:%M"), "end": r.end_time.strftime("%H:%M")} for r in reservations]
+    return [
+        {
+            "start": r.start_time.isoformat(),
+            "end": r.end_time.isoformat()
+        }
+        for r in reservations
+    ]
 
 
 @router.delete("/{reservation_id}", status_code=status.HTTP_204_NO_CONTENT)

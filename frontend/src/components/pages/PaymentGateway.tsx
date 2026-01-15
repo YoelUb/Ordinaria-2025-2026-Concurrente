@@ -1,4 +1,4 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useRef} from 'react';
 import {useLocation, useNavigate} from 'react-router-dom';
 import {CreditCard, Lock, Calendar, User, Check, X, Download, ArrowLeft, Loader2} from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -15,6 +15,8 @@ export default function PaymentGateway() {
     const [progress, setProgress] = useState(0);
 
     const [isProcessing, setIsProcessing] = useState(false);
+    const [hasSubmitted, setHasSubmitted] = useState(false); // NUEVO: Previene doble envío
+    const submissionRef = useRef(false); // NUEVO: Referencia para bloqueo inmediato
 
     useEffect(() => {
         if (!reservationData || !displayData) {
@@ -105,6 +107,16 @@ export default function PaymentGateway() {
     };
 
     const completeReservation = async () => {
+        // PROTECCIÓN CONTRA DOBLE ENVÍO
+        if (submissionRef.current || hasSubmitted) {
+            console.log('⚠️ Intento de doble envío bloqueado');
+            return;
+        }
+
+        // Marcamos como enviado inmediatamente
+        submissionRef.current = true;
+        setHasSubmitted(true);
+
         try {
             const token = localStorage.getItem('token');
             const response = await fetch('http://localhost:8000/api/v1/reservations/', {
@@ -132,6 +144,10 @@ export default function PaymentGateway() {
             console.error(error);
             setStep('error');
             toast.error(error.message);
+            // Solo reseteamos si hay error para permitir reintentar
+            submissionRef.current = false;
+            setHasSubmitted(false);
+        } finally {
             setIsProcessing(false);
         }
     };
@@ -147,13 +163,18 @@ export default function PaymentGateway() {
                     completeReservation();
                     return 100;
                 }
-                return prev + 10;
+                return prev + 5; // Incremento más suave
             });
-        }, 200);
+        }, 100); // Actualización más frecuente
     };
 
     const handleSubmit = () => {
-        if (isProcessing) return;
+        // PROTECCIÓN: No permitir múltiples clicks
+        if (isProcessing || hasSubmitted) {
+            console.log('⚠️ Ya se está procesando el pago');
+            return;
+        }
+
         if (validateCard()) {
             setIsProcessing(true);
             simulatePayment();
@@ -178,6 +199,15 @@ export default function PaymentGateway() {
                 .input-field { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
                 .input-field:focus { border-color: rgba(255, 255, 255, 0.3); outline: none; }
                 .input-field.error { border-color: rgba(239, 68, 68, 0.5); }
+                
+                /* Animación de brillo para la barra de progreso */
+                @keyframes shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(100%); }
+                }
+                .animate-shimmer {
+                    animation: shimmer 2s infinite;
+                }
             `}</style>
 
             <div className="fixed inset-0 z-0">
@@ -227,7 +257,7 @@ export default function PaymentGateway() {
                                                 onChange={(e) => handleInputChange('number', e.target.value)}
                                                 placeholder="1234 5678 9012 3456"
                                                 className={`input-field w-full pl-12 pr-16 py-4 rounded-xl text-white ${errors.number ? 'error animate-shake' : ''}`}
-                                                disabled={isProcessing}
+                                                disabled={isProcessing || hasSubmitted}
                                             />
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-50">
                                                 {getCardType(cardData.number) === 'visa' && <span className="text-blue-400 font-bold text-xs">VISA</span>}
@@ -247,7 +277,7 @@ export default function PaymentGateway() {
                                                 onChange={(e) => handleInputChange('name', e.target.value)}
                                                 placeholder="NOMBRE SIN NÚMEROS"
                                                 className={`input-field w-full pl-12 pr-4 py-4 rounded-xl text-white ${errors.name ? 'error animate-shake' : ''}`}
-                                                disabled={isProcessing}
+                                                disabled={isProcessing || hasSubmitted}
                                             />
                                         </div>
                                         {errors.name && <p className="text-red-400 text-xs mt-2 ml-1 flex gap-1 items-center"><X size={12}/> {errors.name}</p>}
@@ -264,7 +294,7 @@ export default function PaymentGateway() {
                                                     onChange={(e) => handleInputChange('expiry', e.target.value)}
                                                     placeholder="MM/AA"
                                                     className={`input-field w-full pl-12 pr-4 py-4 rounded-xl text-white ${errors.expiry ? 'error animate-shake' : ''}`}
-                                                    disabled={isProcessing}
+                                                    disabled={isProcessing || hasSubmitted}
                                                 />
                                             </div>
                                             {errors.expiry && <p className="text-red-400 text-xs mt-2 ml-1">{errors.expiry}</p>}
@@ -280,7 +310,7 @@ export default function PaymentGateway() {
                                                     placeholder="123"
                                                     maxLength={4}
                                                     className={`input-field w-full pl-12 pr-4 py-4 rounded-xl text-white ${errors.cvv ? 'error animate-shake' : ''}`}
-                                                    disabled={isProcessing}
+                                                    disabled={isProcessing || hasSubmitted}
                                                 />
                                             </div>
                                             {errors.cvv && <p className="text-red-400 text-xs mt-2 ml-1">{errors.cvv}</p>}
@@ -290,7 +320,7 @@ export default function PaymentGateway() {
                                     <div className="pt-6 border-t border-white/10">
                                         <button
                                             onClick={handleSubmit}
-                                            disabled={isProcessing}
+                                            disabled={isProcessing || hasSubmitted}
                                             className="w-full py-4 bg-white text-black rounded-full font-bold text-lg hover:bg-gray-200 transition flex items-center justify-center gap-2 cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isProcessing ? <><Loader2 className="animate-spin" size={20}/> Procesando...</> : <><Lock size={18}/> Pagar {displayData.total?.toFixed(2)}€</>}
@@ -340,9 +370,20 @@ export default function PaymentGateway() {
                             <div className="glass p-12 rounded-3xl text-center max-w-md w-full border-brand-primary/30">
                                 <Loader2 size={64} className="animate-spin text-brand-primary mx-auto mb-8" />
                                 <h2 className="text-3xl font-light mb-4 italic">Verificando <span className="font-bold not-italic">pago...</span></h2>
-                                <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden mt-6">
-                                    <div className="bg-brand-primary h-full transition-all duration-300" style={{width: `${progress}%`}}></div>
+
+                                {/* Barra de progreso mejorada */}
+                                <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden mt-6 relative shadow-inner">
+                                    <div
+                                        className="h-full transition-all duration-300 ease-out bg-gradient-to-r from-purple-600 via-purple-500 to-purple-400 relative overflow-hidden"
+                                        style={{width: `${progress}%`}}
+                                    >
+                                        {/* Efecto de brillo animado */}
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                                    </div>
                                 </div>
+
+                                {/* Porcentaje */}
+                                <p className="text-sm text-purple-400 font-mono mt-3">{progress}%</p>
                             </div>
                         </div>
                     )}
@@ -402,7 +443,15 @@ export default function PaymentGateway() {
                                 <h2 className="text-3xl font-bold mb-4">Error en el Pago</h2>
                                 <p className="text-gray-400 mb-8 font-light">La transacción ha sido rechazada por el banco o la pista ya no está disponible.</p>
                                 <div className="space-y-3">
-                                    <button onClick={() => setStep('form')} className="w-full py-4 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition cursor-pointer border-none">
+                                    <button
+                                        onClick={() => {
+                                            setStep('form');
+                                            // Reseteamos los flags para permitir reintentar
+                                            setHasSubmitted(false);
+                                            submissionRef.current = false;
+                                        }}
+                                        className="w-full py-4 bg-white text-black rounded-full font-bold hover:bg-gray-200 transition cursor-pointer border-none"
+                                    >
                                         Reintentar Pago
                                     </button>
                                     <button onClick={() => navigate('/dashboard')} className="w-full py-4 glass rounded-full hover:bg-white/10 transition cursor-pointer border-none font-medium">
