@@ -1,5 +1,6 @@
-import os
 from pydantic_settings import BaseSettings
+from typing import Optional
+
 
 class Settings(BaseSettings):
     # --- Proyecto ---
@@ -24,18 +25,16 @@ class Settings(BaseSettings):
     ADMIN_USER: str
     ADMIN_PASSWORD: str
     ADMIN_EMAIL: str
+    # Email al que se desvían los correos si el destinatario es el admin (para pruebas)
+    DEVIATION_EMAIL: Optional[str] = None
 
-    # --- Email ---
+    # --- Email (SMTP) ---
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
     MAIL_PORT: int = 587
     MAIL_SERVER: str
-    MAIL_FROM_NAME: str = "Sistema Reservas"
-    MAIL_STARTTLS: bool = True
-    MAIL_SSL_TLS: bool = False
-    USE_CREDENTIALS: bool = True
-    VALIDATE_CERTS: bool = True
+    MAIL_FROM_NAME: str = "Sistema Residencial"
 
     # --- Firebase ---
     FIREBASE_CREDENTIALS_PATH: str
@@ -44,5 +43,6 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
         extra = "ignore"
+
 
 settings = Settings()

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from src.core.config import settings
 from src.services.firebase import initialize_firebase
-from src.routers import users, auth, reservations
+from src.routers import users, auth, reservations, support
 from src.services.storage import init_bucket
 from src.scripts.init_db import create_initial_data
 
@@ -54,6 +54,8 @@ app.add_middleware(
 app.include_router(auth.router, tags=["Authentication"], prefix="/api/v1/auth")
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(reservations.router, prefix="/api/v1/reservations", tags=["Reservations"])
+
+app.include_router(support.router, prefix="/api/v1/support", tags=["support"])
 
 
 @app.get("/")

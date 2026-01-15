@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import {
     Calendar, User, Settings, LogOut, Home, Bell, Search, Plus,
     X, Loader2, Save, MapPin, AlertCircle, Camera, Trash2, Sun, Moon, Menu, CheckCircle,
-    BarChart3, TrendingUp, ChevronDown, ChevronUp, Clock, CreditCard, Shield
+    BarChart3, TrendingUp, ChevronDown, ChevronUp, CreditCard,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -226,6 +226,7 @@ export default function Dashboard() {
     const [profileForm, setProfileForm] = useState({phone: '', address: '', apartment: '', postal_code: ''});
     const [addressSuggestions, setAddressSuggestions] = useState<PhotonFeature[]>([]);
     const [showAddressMenu, setShowAddressMenu] = useState(false);
+    const [selectedAddressValid, setSelectedAddressValid] = useState(false);
 
     // Gastos mensuales
     const [monthlyExpenses, setMonthlyExpenses] = useState<MonthlyExpense[]>([]);
@@ -408,7 +409,7 @@ export default function Dashboard() {
             if (document.visibilityState === 'visible') {
                 fetchData();
             }
-        }, 4000); // Cambiado de 30s a 4s
+        }, 4000);
         return () => clearInterval(intervalId);
     }, [fetchData]);
 
@@ -446,7 +447,7 @@ export default function Dashboard() {
 
             // Recargar datos después de reserva exitosa
             fetchData();
-            fetchPrices(); // También actualizar precios
+            fetchPrices();
         }
     }, [fetchData]);
 
@@ -499,6 +500,7 @@ export default function Dashboard() {
         setLoadingSlots(true);
         fetchAvailability();
 
+        // Polling de disponibilidad cada 4 segundos solo cuando el modal está abierto
         const interval = setInterval(fetchAvailability, 4000);
         return () => clearInterval(interval);
     }, [newResFacility, newResDate, showReserveModal, facilitiesConfig]);
@@ -654,6 +656,7 @@ export default function Dashboard() {
         }));
         setAddressSuggestions([]);
         setShowAddressMenu(false);
+        setSelectedAddressValid(true);
     };
 
     // --- 7. Avatar (MinIO) ---
@@ -854,7 +857,13 @@ export default function Dashboard() {
             return;
         }
 
-        if (profileForm.address.trim().length < 5 || /^\d+$/.test(profileForm.address)) {
+        // Validación de dirección: debe ser una de las sugeridas
+        if (!selectedAddressValid && addressSuggestions.length > 0) {
+            toast.error("Por favor, selecciona una dirección de la lista de sugerencias.");
+            return;
+        }
+
+        if (profileForm.address.trim().length < 5) {
             toast.error("Dirección no válida.");
             return;
         }
@@ -879,6 +888,7 @@ export default function Dashboard() {
                 const updatedUser = await response.json();
                 setUser(updatedUser);
                 setShowCompleteProfile(false);
+                setSelectedAddressValid(false);
                 toast.success("¡Perfil actualizado correctamente!", {id: loadingToast});
             } else {
                 const errorData = await response.json();
@@ -1162,7 +1172,7 @@ export default function Dashboard() {
                 {/* HOME TAB */}
                 {activeTab === 'home' && (
                     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                             <div className="glass p-4 md:p-6 rounded-2xl">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div
@@ -1173,19 +1183,6 @@ export default function Dashboard() {
                                         <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Reservas
                                             totales</p>
                                         <p className="text-2xl md:text-3xl font-light">{reservations.length}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="glass p-4 md:p-6 rounded-2xl">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div
-                                        className="w-10 h-10 md:w-12 md:h-12 bg-green-500/20 rounded-full flex items-center justify-center">
-                                        <TrendingUp className="text-green-400" size={20}/>
-                                    </div>
-                                    <div>
-                                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Precios
-                                            actualizados</p>
-                                        <p className="text-2xl md:text-3xl font-light">Cada 4s</p>
                                     </div>
                                 </div>
                             </div>
@@ -1774,10 +1771,10 @@ export default function Dashboard() {
                 )}
             </main>
 
-            {/* MODAL RESERVA - VERSIÓN PREMIUM MEJORADA */}
+            {/* MODAL RESERVA - VERSIÓN MEJORADA SIN SCROLL */}
             {showReserveModal && (
                 <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-                    <div className={`relative max-w-2xl w-full h-[90vh] overflow-hidden rounded-3xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'} shadow-2xl`}>
+                    <div className={`relative max-w-2xl w-full max-h-[85vh] overflow-hidden rounded-3xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'} shadow-2xl`}>
                         {/* Cabecera con degradado dinámico */}
                         <div className={`bg-gradient-to-r ${facilityColor} p-6 md:p-8 relative overflow-hidden`}>
                             <div className="absolute top-4 right-4">
@@ -1787,114 +1784,95 @@ export default function Dashboard() {
                                 </button>
                             </div>
 
-                            <div className="flex flex-col md:flex-row items-center justify-between mt-8">
+                            <div className="flex flex-col md:flex-row items-center justify-between mt-4">
                                 <div className="text-white text-center md:text-left">
-                                    <div className="text-5xl md:text-6xl mb-4 animate-bounce">
+                                    <div className="text-4xl md:text-5xl mb-3 animate-bounce">
                                         {facilityIcon}
                                     </div>
-                                    <h2 className="text-2xl md:text-3xl font-bold mb-2">Reservar {newResFacility}</h2>
-                                    <p className="opacity-90">Selecciona fecha y hora para tu reserva</p>
+                                    <h2 className="text-xl md:text-2xl font-bold mb-2">Reservar {newResFacility}</h2>
+                                    <p className="opacity-90 text-sm">Selecciona fecha y hora para tu reserva</p>
                                 </div>
 
-                                <div className="mt-6 md:mt-0 glass p-4 md:p-6 rounded-2xl backdrop-blur-sm bg-white/10 border border-white/20">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                                            <CreditCard className="text-white" size={24}/>
+                                <div className="mt-4 md:mt-0 glass p-3 md:p-4 rounded-xl backdrop-blur-sm bg-white/10 border border-white/20">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                                            <CreditCard className="text-white" size={20}/>
                                         </div>
                                         <div>
-                                            <p className="text-white text-sm opacity-90">Precio por reserva</p>
-                                            <p className="text-2xl font-bold text-white">
+                                            <p className="text-white text-xs opacity-90">Precio por reserva</p>
+                                            <p className="text-lg font-bold text-white">
                                                 {selectedFacilityInfo?.price || '15.00'}€
                                             </p>
                                         </div>
-                                    </div>
-                                    <div className="mt-4 flex items-center gap-2 text-white/80 text-sm">
-                                        <Shield size={14}/>
-                                        <span>Pago 100% seguro • Cancelación gratuita</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Contenido del formulario - Diseño tipo tarjeta */}
-                        <div className="p-6 md:p-8 overflow-y-auto h-[calc(100%-200px)]">
-                            <div className="space-y-6">
+                        {/* Contenido del formulario - Sin scroll */}
+                        <div className="p-4 md:p-6 max-h-[50vh] overflow-y-auto">
+                            <div className="space-y-4">
                                 {/* Instalación */}
-                                <div className={`glass p-4 md:p-6 rounded-2xl border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
-                                    <label className={`block text-sm font-medium mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 rounded-lg bg-blue-500/10">
-                                                <Calendar className="text-blue-400" size={16}/>
-                                            </div>
-                                            <span>Instalación</span>
-                                        </div>
+                                <div className={`glass p-3 md:p-4 rounded-xl border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                                    <label className={`block text-xs font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        Instalación
                                     </label>
                                     <select
                                         value={newResFacility}
                                         onChange={e => setNewResFacility(e.target.value)}
-                                        className={`w-full border rounded-xl px-4 py-3 text-lg font-medium transition-all ${isDarkMode 
-                                            ? 'bg-black/40 border-white/10 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20' 
-                                            : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'}`}
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm transition-all ${isDarkMode 
+                                            ? 'bg-black/40 border-white/10 text-white focus:border-blue-500' 
+                                            : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-500'}`}
                                     >
                                         {Object.values(facilitiesConfig).map((facility, idx) => (
                                             <option key={idx} value={facility.name}>
-                                                {facility.name} • {facility.price}€ • Capacidad: {facility.capacity}
+                                                {facility.name} • {facility.price}€
                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
                                 {/* Fecha */}
-                                <div className={`glass p-4 md:p-6 rounded-2xl border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
-                                    <label className={`block text-sm font-medium mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 rounded-lg bg-green-500/10">
-                                                <Calendar className="text-green-400" size={16}/>
-                                            </div>
-                                            <span>Fecha de reserva</span>
-                                        </div>
+                                <div className={`glass p-3 md:p-4 rounded-xl border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                                    <label className={`block text-xs font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        Fecha de reserva
                                     </label>
                                     <input
                                         type="date"
                                         value={newResDate}
                                         min={getMinDate()}
                                         onChange={e => setNewResDate(e.target.value)}
-                                        className={`w-full border rounded-xl px-4 py-3 text-lg font-medium transition-all ${isDarkMode 
-                                            ? 'bg-black/40 border-white/10 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/20 scheme-dark' 
-                                            : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 scheme-light'}`}
+                                        className={`w-full border rounded-lg px-3 py-2 text-sm transition-all ${isDarkMode 
+                                            ? 'bg-black/40 border-white/10 text-white focus:border-green-500 scheme-dark' 
+                                            : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-green-500 scheme-light'}`}
                                     />
                                 </div>
 
-                                {/* Selector de horas - Diseño mejorado */}
-                                <div className={`glass p-4 md:p-6 rounded-2xl border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 rounded-lg bg-purple-500/10">
-                                                <Clock className="text-purple-400" size={16}/>
-                                            </div>
-                                            <div>
-                                                <label className={`block text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                                    Horarios disponibles
-                                                </label>
-                                                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                                    Se actualizan en tiempo real
-                                                </p>
-                                            </div>
+                                {/* Selector de horas */}
+                                <div className={`glass p-3 md:p-4 rounded-xl border ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <label className={`block text-xs font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                                Horarios disponibles
+                                            </label>
+                                            <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                Se actualizan en tiempo real
+                                            </p>
                                         </div>
                                         {loadingSlots && (
-                                            <div className="flex items-center gap-2 text-sm text-purple-400">
-                                                <Loader2 size={14} className="animate-spin"/>
+                                            <div className="flex items-center gap-1 text-xs text-purple-400">
+                                                <Loader2 size={12} className="animate-spin"/>
                                                 Actualizando...
                                             </div>
                                         )}
                                     </div>
 
                                     {loadingSlots ? (
-                                        <div className="flex justify-center py-8">
-                                            <Loader2 className="animate-spin text-purple-500" size={32}/>
+                                        <div className="flex justify-center py-4">
+                                            <Loader2 className="animate-spin text-purple-500" size={24}/>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                             {TIME_SLOTS.map((slot) => {
                                                 const slotInfo = slotAvailability[slot];
                                                 const currentCapacity = slotInfo?.capacity || selectedFacilityInfo?.capacity || 1;
@@ -1910,25 +1888,24 @@ export default function Dashboard() {
                                                         disabled={isFull || userAlreadyBooked}
                                                         onClick={() => setSelectedTimeSlot(slot)}
                                                         className={`
-                                                            relative p-4 rounded-xl border-2 transition-all duration-300
-                                                            flex flex-col items-center justify-center gap-2
+                                                            relative p-3 rounded-lg border transition-all duration-200
+                                                            flex flex-col items-center justify-center gap-1
                                                             ${isFull || userAlreadyBooked
                                                                 ? 'border-red-300 bg-red-50/50 text-red-400 cursor-not-allowed'
                                                                 : isSelected
                                                                     ? `${isDarkMode 
                                                                         ? 'border-blue-500 bg-blue-500/20 text-white' 
-                                                                        : 'border-blue-500 bg-blue-50 text-blue-700'} shadow-lg scale-105`
+                                                                        : 'border-blue-500 bg-blue-50 text-blue-700'}`
                                                                     : `${isDarkMode 
                                                                         ? 'border-white/10 hover:border-blue-400/50 bg-white/5 hover:bg-blue-500/10 text-white' 
                                                                         : 'border-gray-200 hover:border-blue-300 bg-white hover:bg-blue-50 text-gray-700'}`
                                                             }
                                                         `}
                                                     >
-                                                        <span className="text-lg font-bold">{slot}</span>
-
+                                                        <span className="text-sm font-bold">{slot}</span>
                                                         <div className="flex items-center gap-1">
-                                                            <div className={`w-2 h-2 rounded-full ${isFull ? 'bg-red-500' : available > 0 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                                                            <span className="text-xs font-medium">
+                                                            <div className={`w-1.5 h-1.5 rounded-full ${isFull ? 'bg-red-500' : available > 0 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                                                            <span className="text-[10px] font-medium">
                                                                 {userAlreadyBooked
                                                                     ? 'Tu reserva'
                                                                     : isFull
@@ -1936,81 +1913,75 @@ export default function Dashboard() {
                                                                         : `${available} libre${available !== 1 ? 's' : ''}`}
                                                             </span>
                                                         </div>
-
-                                                        {userAlreadyBooked && (
-                                                            <div className="absolute -top-2 -right-2">
-                                                                <div className="bg-purple-500 text-white text-[10px] px-2 py-1 rounded-full">
-                                                                    TÚ
-                                                                </div>
-                                                            </div>
-                                                        )}
                                                     </button>
                                                 );
                                             })}
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        </div>
 
-                                {/* Botones de acción */}
-                                <div className="flex gap-4 pt-4">
-                                    <button
-                                        onClick={() => setShowReserveModal(false)}
-                                        className={`flex-1 py-4 rounded-xl font-medium transition ${isDarkMode 
-                                            ? 'bg-white/10 hover:bg-white/20 text-white' 
-                                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
-                                    >
-                                        Cancelar
-                                    </button>
+                        {/* Botones de acción - Siempre visibles */}
+                        <div className="p-4 border-t border-white/10">
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowReserveModal(false)}
+                                    className={`flex-1 py-2.5 rounded-lg font-medium transition ${isDarkMode 
+                                        ? 'bg-white/10 hover:bg-white/20 text-white' 
+                                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                                >
+                                    Cancelar
+                                </button>
 
-                                    <button
-                                        onClick={handleCreateReservation}
-                                        disabled={!selectedTimeSlot ||
-                                            (slotAvailability[selectedTimeSlot || '']?.count || 0) >=
+                                <button
+                                    onClick={handleCreateReservation}
+                                    disabled={!selectedTimeSlot ||
+                                        (slotAvailability[selectedTimeSlot || '']?.count || 0) >=
+                                        (slotAvailability[selectedTimeSlot || '']?.capacity || selectedFacilityInfo?.capacity || 1) ||
+                                        userAlreadyHasReservation(selectedTimeSlot)}
+                                    className={`flex-1 py-2.5 rounded-lg font-bold transition flex items-center justify-center gap-2
+                                        ${!selectedTimeSlot || 
+                                            (slotAvailability[selectedTimeSlot || '']?.count || 0) >= 
                                             (slotAvailability[selectedTimeSlot || '']?.capacity || selectedFacilityInfo?.capacity || 1) ||
-                                            userAlreadyHasReservation(selectedTimeSlot)}
-                                        className={`flex-1 py-4 rounded-xl font-bold transition flex items-center justify-center gap-3
-                                            ${!selectedTimeSlot || 
-                                                (slotAvailability[selectedTimeSlot || '']?.count || 0) >= 
-                                                (slotAvailability[selectedTimeSlot || '']?.capacity || selectedFacilityInfo?.capacity || 1) ||
-                                                userAlreadyHasReservation(selectedTimeSlot)
-                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                : `bg-gradient-to-r ${facilityColor} text-white hover:opacity-90`
-                                            }`}
-                                    >
-                                        <CreditCard size={20}/>
-                                        <span>Continuar al Pago</span>
-                                        <span className="ml-2 opacity-90">
-                                            ({selectedFacilityInfo?.price || '15.00'}€)
-                                        </span>
-                                    </button>
-                                </div>
+                                            userAlreadyHasReservation(selectedTimeSlot)
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : `bg-gradient-to-r ${facilityColor} text-white hover:opacity-90`
+                                        }`}
+                                >
+                                    <CreditCard size={16}/>
+                                    <span>Continuar al Pago</span>
+                                    <span className="text-xs opacity-90">
+                                        ({selectedFacilityInfo?.price || '15.00'}€)
+                                    </span>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* MODAL COMPLETAR PERFIL */}
+            {/* MODAL COMPLETAR PERFIL CON VALIDACIÓN DE DIRECCIÓN */}
             {showCompleteProfile && (
                 <div
-                    className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4 md:p-6">
+                    className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[60] p-4">
                     <div
-                        className={`glass p-4 md:p-8 rounded-2xl max-w-md w-full border border-purple-500/50 shadow-[0_0_50px_rgba(168,85,247,0.15)] animate-in fade-in zoom-in duration-300 ${isDarkMode ? '' : 'bg-white'}`}>
-                        <div className="text-center mb-6">
+                        className={`glass p-4 md:p-6 rounded-2xl max-w-md w-full border border-purple-500/50 ${isDarkMode ? '' : 'bg-white'}`}>
+                        <div className="text-center mb-4">
                             <div
-                                className="w-12 h-12 md:w-16 md:h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-purple-500/30">
-                                <User size={24} className="text-purple-400"/>
+                                className="w-10 h-10 md:w-12 md:h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3 border border-purple-500/30">
+                                <User size={20} className="text-purple-400"/>
                             </div>
-                            <h2 className={`text-xl md:text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Completa
+                            <h2 className={`text-lg md:text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Completa
                                 tu perfil</h2>
                             <div
-                                className="flex items-center gap-2 justify-center mt-3 text-amber-300 bg-amber-900/20 py-2 px-3 rounded-lg border border-amber-500/20">
-                                <AlertCircle size={14}/>
+                                className="flex items-center gap-1 justify-center mt-2 text-amber-300 bg-amber-900/20 py-1.5 px-2 rounded-lg border border-amber-500/20">
+                                <AlertCircle size={12}/>
                                 <p className="text-xs font-medium">Requerido para acceder a las reservas</p>
                             </div>
                         </div>
 
-                        <form onSubmit={handleUpdateProfile} className="space-y-4 md:space-y-5">
+                        <form onSubmit={handleUpdateProfile} className="space-y-3">
                             <div>
                                 <label
                                     className="text-xs text-gray-400 uppercase tracking-wider ml-1 font-semibold">Teléfono
@@ -2020,7 +1991,7 @@ export default function Dashboard() {
                                     type="tel"
                                     value={profileForm.phone}
                                     onChange={handlePhoneChange}
-                                    className={`w-full border rounded-xl px-4 py-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
+                                    className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
                                     placeholder="Ej: 600123456"
                                     maxLength={9}
                                 />
@@ -2029,27 +2000,35 @@ export default function Dashboard() {
 
                             <div className="relative" ref={wrapperRef}>
                                 <label
-                                    className="text-xs text-gray-400 uppercase tracking-wider ml-1 font-semibold">Dirección</label>
+                                    className="text-xs text-gray-400 uppercase tracking-wider ml-1 font-semibold">Dirección *</label>
                                 <div className="relative mt-1">
-                                    <MapPin size={16}
+                                    <MapPin size={14}
                                             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-                                    <input required type="text" value={profileForm.address}
-                                           onChange={e => {
-                                               setProfileForm({
-                                                   ...profileForm,
-                                                   address: e.target.value
-                                               });
-                                               setShowAddressMenu(true);
-                                           }}
-                                           className={`w-full border rounded-xl pl-10 pr-4 py-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
-                                           placeholder="Empieza a escribir tu calle..."
-                                           autoComplete="off"/>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={profileForm.address}
+                                        onChange={e => {
+                                            setProfileForm({
+                                                ...profileForm,
+                                                address: e.target.value
+                                            });
+                                            setShowAddressMenu(true);
+                                            setSelectedAddressValid(false);
+                                        }}
+                                        className={`w-full border rounded-lg pl-9 pr-4 py-2.5 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
+                                        placeholder="Empieza a escribir tu calle..."
+                                        autoComplete="off"
+                                    />
                                 </div>
+                                {!selectedAddressValid && addressSuggestions.length > 0 && (
+                                    <p className="text-xs text-red-500 mt-1">Debes seleccionar una dirección de la lista</p>
+                                )}
                                 {addressSuggestions.length > 0 && showAddressMenu && (
-                                    <ul className={`absolute z-50 w-full mt-1 border rounded-xl shadow-2xl max-h-48 overflow-y-auto ${isDarkMode ? 'bg-gray-900 border-white/10 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
+                                    <ul className={`absolute z-50 w-full mt-1 border rounded-lg shadow-xl max-h-48 overflow-y-auto ${isDarkMode ? 'bg-gray-900 border-white/10 text-gray-300' : 'bg-white border-gray-200 text-gray-700'}`}>
                                         {addressSuggestions.map((item, idx) => (
                                             <li key={idx} onClick={() => handleSelectAddress(item)}
-                                                className={`px-4 py-3 cursor-pointer border-b last:border-0 transition-colors ${isDarkMode ? 'hover:bg-purple-900/30 border-white/5 hover:text-white' : 'hover:bg-gray-100 border-gray-100 hover:text-gray-900'}`}>
+                                                className={`px-3 py-2 cursor-pointer border-b last:border-0 transition-colors text-sm ${isDarkMode ? 'hover:bg-purple-900/30 border-white/5 hover:text-white' : 'hover:bg-gray-100 border-gray-100 hover:text-gray-900'}`}>
                                                 {item.properties.street || item.properties.name} {item.properties.housenumber}, {item.properties.city}
                                             </li>
                                         ))}
@@ -2057,7 +2036,7 @@ export default function Dashboard() {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label
                                         className="text-xs text-gray-400 uppercase tracking-wider ml-1 font-semibold">Apartamento</label>
@@ -2066,7 +2045,7 @@ export default function Dashboard() {
                                         type="text"
                                         value={profileForm.apartment}
                                         onChange={handleApartmentChange}
-                                        className={`w-full border rounded-xl px-4 py-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition uppercase placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
+                                        className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition uppercase placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
                                         placeholder="Ej: 4B"
                                         maxLength={3}
                                     />
@@ -2081,7 +2060,7 @@ export default function Dashboard() {
                                         type="text"
                                         value={profileForm.postal_code}
                                         onChange={handlePostalCodeChange}
-                                        className={`w-full border rounded-xl px-4 py-3 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
+                                        className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition placeholder-gray-500 ${isDarkMode ? 'bg-black/40 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'}`}
                                         placeholder="28000"
                                         maxLength={5}
                                     />
@@ -2090,9 +2069,9 @@ export default function Dashboard() {
                             </div>
 
                             <button type="submit" disabled={updatingProfile}
-                                    className="w-full bg-gradient-to-r from-purple-600 via-purple-500 to-purple-600 hover:from-purple-700 hover:via-purple-600 hover:to-purple-700 text-white font-bold py-3.5 rounded-xl transition flex items-center justify-center gap-2 mt-6 disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer shadow-2xl shadow-purple-900/40 animate-pulse animate-infinite">
-                                {updatingProfile ? <Loader2 className="animate-spin"/> : <><Save
-                                    size={20}/> CONFIRMAR Y GUARDAR</>}
+                                    className="w-full bg-gradient-to-r from-purple-600 via-purple-500 to-purple-600 hover:from-purple-700 hover:via-purple-600 hover:to-purple-700 text-white font-bold py-3 rounded-lg transition flex items-center justify-center gap-2 mt-4 disabled:opacity-50 disabled:cursor-not-allowed border-none cursor-pointer">
+                                {updatingProfile ? <Loader2 className="animate-spin" size={16}/> : <><Save
+                                    size={16}/> CONFIRMAR Y GUARDAR</>}
                             </button>
                         </form>
                     </div>
@@ -2102,37 +2081,37 @@ export default function Dashboard() {
             {/* MODAL CONFIRMAR BORRAR RESERVA */}
             {showDeleteModal && (
                 <div
-                    className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[70] p-4 md:p-6">
+                    className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
                     <div
-                        className={`glass p-6 md:p-8 rounded-2xl max-w-md w-full border-red-500/30 ${isDarkMode ? '' : 'bg-white'}`}>
-                        <div className="text-center mb-6">
+                        className={`glass p-4 md:p-6 rounded-xl max-w-md w-full border-red-500/30 ${isDarkMode ? '' : 'bg-white'}`}>
+                        <div className="text-center mb-4">
                             <div
-                                className="w-12 h-12 md:w-16 md:h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
-                                <Trash2 size={24} className="text-red-400"/>
+                                className="w-10 h-10 md:w-12 md:h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3 border border-red-500/30">
+                                <Trash2 size={20} className="text-red-400"/>
                             </div>
-                            <h2 className={`text-xl md:text-2xl font-semibold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>¿Eliminar
+                            <h2 className={`text-lg md:text-xl font-semibold mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>¿Eliminar
                                 Reserva?</h2>
                             <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Esta acción no se
                                 puede deshacer.</p>
                         </div>
 
-                        <div className="flex gap-3 md:gap-4">
+                        <div className="flex gap-2">
                             <button
                                 onClick={() => {
                                     setShowDeleteModal(false);
                                     setReservationToDelete(null);
                                 }}
-                                className={`flex-1 py-2 md:py-3 rounded-lg transition cursor-pointer border-none ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
+                                className={`flex-1 py-2 rounded-lg transition cursor-pointer border-none ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={() => reservationToDelete && handleDeleteReservation(reservationToDelete)}
                                 disabled={deletingReservation}
-                                className="flex-1 py-2 md:py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition cursor-pointer border-none disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition cursor-pointer border-none disabled:opacity-50 flex items-center justify-center gap-1"
                             >
                                 {deletingReservation ?
-                                    <Loader2 className="animate-spin" size={16}/> : 'Eliminar'}
+                                    <Loader2 className="animate-spin" size={14}/> : 'Eliminar'}
                             </button>
                         </div>
                     </div>

@@ -2,7 +2,7 @@ import {useState, useEffect, useRef} from 'react';
 import {Lock, Mail, Eye, EyeOff, User, Phone, ArrowRight, Home, AlertCircle, MapPin, Loader2, CheckCircle, X} from 'lucide-react';
 import {signInWithPopup} from "firebase/auth";
 import {auth, googleProvider, githubProvider} from "../../config/Firebase";
-import {useNavigate, Link} from 'react-router-dom'; // Añadido Link
+import {useNavigate, Link} from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 // --- Expresiones Regulares Actualizadas ---
@@ -21,6 +21,9 @@ type PhotonFeature = {
         city?: string;
         country?: string;
         state?: string;
+    };
+    geometry: {
+        coordinates: [number, number];
     };
 };
 
@@ -46,54 +49,41 @@ export default function RegisterPage() {
     const [addressSuggestions, setAddressSuggestions] = useState<PhotonFeature[]>([]);
     const [showAddressMenu, setShowAddressMenu] = useState(false);
     const [loadingAddress, setLoadingAddress] = useState(false);
+    const [selectedAddress, setSelectedAddress] = useState<PhotonFeature | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // --- Manejadores de cambio con validaciones en tiempo real ---
     const handleNameChange = (value: string) => {
-        // Solo letras y espacios, sin números
         const filteredValue = value.replace(/[0-9]/g, '');
         setFormData(prev => ({...prev, name: filteredValue}));
         if (errors.name) setErrors(prev => ({...prev, name: ''}));
     };
 
     const handlePhoneChange = (value: string) => {
-        // Solo números, empieza con 6, máximo 9 dígitos
         let cleanValue = value.replace(/\D/g, '');
-
-        // Asegurar que empiece por 6
         if (cleanValue && cleanValue.charAt(0) !== '6') {
             cleanValue = '6' + cleanValue.substring(1);
         }
-
-        // Limitar a 9 dígitos
         if (cleanValue.length > 9) {
             cleanValue = cleanValue.substring(0, 9);
         }
-
         setFormData(prev => ({...prev, phone: cleanValue}));
         if (errors.phone) setErrors(prev => ({...prev, phone: ''}));
     };
 
     const handleApartmentChange = (value: string) => {
-        // Convertir a mayúsculas, solo números y letras
         let cleanValue = value.toUpperCase().replace(/[^0-9A-Z]/g, '');
-
-        // Limitar a máximo 3 caracteres (2 números + 1 letra)
         if (cleanValue.length > 3) {
             cleanValue = cleanValue.substring(0, 3);
         }
-
-        // Validar que los primeros caracteres sean números y el último sea letra
         const match = cleanValue.match(/^(\d{0,2})([A-Z]?)$/);
         if (match) {
             setFormData(prev => ({...prev, apartment: match[1] + match[2]}));
         }
-
         if (errors.apartment) setErrors(prev => ({...prev, apartment: ''}));
     };
 
     const handlePostalCodeChange = (value: string) => {
-        // Solo números, máximo 5 dígitos
         let cleanValue = value.replace(/\D/g, '');
         if (cleanValue.length > 5) {
             cleanValue = cleanValue.substring(0, 5);
@@ -109,6 +99,7 @@ export default function RegisterPage() {
 
     const handleAddressChange = (value: string) => {
         setFormData(prev => ({...prev, address: value}));
+        setSelectedAddress(null); // Reset selected address when user types
         setShowAddressMenu(true);
         if (errors.address) setErrors(prev => ({...prev, address: ''}));
     };
@@ -123,7 +114,7 @@ export default function RegisterPage() {
         if (errors.confirmPassword) setErrors(prev => ({...prev, confirmPassword: ''}));
     };
 
-    // --- Autocompletado Photon ---
+    // --- Autocompletado Photon con validación de existencia ---
     useEffect(() => {
         if (formData.address.length < 3 || !showAddressMenu) {
             setAddressSuggestions([]);
@@ -132,13 +123,21 @@ export default function RegisterPage() {
         const timeoutId = setTimeout(async () => {
             setLoadingAddress(true);
             try {
-                const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(formData.address)}&limit=5`);
+                const response = await fetch(
+                    `https://photon.komoot.io/api/?q=${encodeURIComponent(formData.address)}&limit=5&lang=es`
+                );
                 if (response.ok) {
                     const data = await response.json();
-                    setAddressSuggestions(data.features || []);
+                    // Filtrar solo resultados con estructura de dirección completa
+                    const validFeatures = (data.features || []).filter((feature: PhotonFeature) => {
+                        const p = feature.properties;
+                        return p.street && p.city && p.postcode && p.housenumber;
+                    });
+                    setAddressSuggestions(validFeatures);
                 }
             } catch (error) {
-                console.error("Error address", error);
+                console.error("Error fetching address", error);
+                setAddressSuggestions([]);
             } finally {
                 setLoadingAddress(false);
             }
@@ -153,7 +152,6 @@ export default function RegisterPage() {
                 setShowAddressMenu(false);
             }
         }
-
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
@@ -165,8 +163,37 @@ export default function RegisterPage() {
         const cityPart = p.city ? `, ${p.city}` : "";
         const fullAddress = `${streetPart}${numberPart}${cityPart}`;
         setFormData(prev => ({...prev, address: fullAddress, postalCode: p.postcode || prev.postalCode}));
+        setSelectedAddress(feature);
         setAddressSuggestions([]);
         setShowAddressMenu(false);
+    };
+
+    // --- Validación mejorada de dirección ---
+    const validateAddress = (address: string): string => {
+        if (!address.trim()) return "La dirección es obligatoria.";
+
+        // No permitir direcciones que sean solo números
+        if (/^\d+$/.test(address.replace(/\s/g, ''))) {
+            return "Escribe una calle válida, no solo números.";
+        }
+
+        // Validar formato de dirección (debe tener calle y número mínimo)
+        const addressParts = address.split(',').map(part => part.trim());
+        if (addressParts.length < 2) {
+            return "La dirección debe incluir calle, número y ciudad (Ej: Calle Mayor 123, Madrid)";
+        }
+
+        // Validar que se haya seleccionado una dirección real de Photon
+        if (!selectedAddress) {
+            return "Por favor, selecciona una dirección de las sugerencias para asegurar que es válida.";
+        }
+
+        const streetPart = addressParts[0];
+        if (!streetPart.match(/\d/)) {
+            return "La dirección debe incluir el número del edificio.";
+        }
+
+        return "";
     };
 
     // --- Validaciones de Formulario ---
@@ -187,13 +214,10 @@ export default function RegisterPage() {
             newErrors.email = "Formato de email inválido.";
         }
 
-        // Validar Dirección
-        if (!formData.address.trim()) {
-            newErrors.address = "La dirección es obligatoria.";
-        } else if (formData.address.length < 5) {
-            newErrors.address = "Dirección demasiado corta.";
-        } else if (/^\d+$/.test(formData.address)) {
-            newErrors.address = "Escribe una calle válida.";
+        // Validar Dirección CON VALIDACIÓN MEJORADA
+        const addressError = validateAddress(formData.address);
+        if (addressError) {
+            newErrors.address = addressError;
         }
 
         // Validar Apartamento
@@ -288,6 +312,11 @@ export default function RegisterPage() {
         const loadingToast = toast.loading('Creando cuenta...');
 
         try {
+            // Verificar que la dirección seleccionada existe en Photon
+            if (!selectedAddress) {
+                throw new Error("Debes seleccionar una dirección válida de las sugerencias.");
+            }
+
             const payload = {
                 email: formData.email,
                 full_name: formData.name.trim(),
@@ -296,6 +325,8 @@ export default function RegisterPage() {
                 phone: formData.phone,
                 address: formData.address.trim(),
                 postal_code: formData.postalCode,
+                latitude: selectedAddress.geometry.coordinates[1],
+                longitude: selectedAddress.geometry.coordinates[0],
                 is_active: false
             };
 
@@ -372,6 +403,31 @@ export default function RegisterPage() {
     const clearPhoneField = () => {
         setFormData(prev => ({...prev, phone: ''}));
         if (errors.phone) setErrors(prev => ({...prev, phone: ''}));
+    };
+
+    // Indicador de dirección válida
+    const AddressValidationIndicator = () => {
+        if (!formData.address) return null;
+
+        if (selectedAddress) {
+            return (
+                <div className="text-green-400 text-xs mt-1 flex items-center gap-1">
+                    <CheckCircle size={12} />
+                    <span>✓ Dirección verificada (seleccionada de Photon)</span>
+                </div>
+            );
+        }
+
+        if (formData.address.length >= 3 && !selectedAddress) {
+            return (
+                <div className="text-amber-400 text-xs mt-1 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    <span>Selecciona una dirección de las sugerencias para validarla</span>
+                </div>
+            );
+        }
+
+        return null;
     };
 
     return (
@@ -473,7 +529,7 @@ export default function RegisterPage() {
                         {/* Fila 2: Dirección y CP */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                             <div className="md:col-span-2 relative" ref={wrapperRef}>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Dirección</label>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Dirección (debe seleccionar de las sugerencias)</label>
                                 <div className="relative">
                                     <MapPin size={20}
                                             className={`absolute left-4 top-1/2 -translate-y-1/2 ${errors.address ? 'text-red-400' : 'text-gray-500'}`}/>
@@ -482,7 +538,7 @@ export default function RegisterPage() {
                                         value={formData.address}
                                         onChange={(e) => handleAddressChange(e.target.value)}
                                         className={getInputClass('address')}
-                                        placeholder="Busca tu calle..."
+                                        placeholder="Escribe y selecciona una dirección real..."
                                         autoComplete="off"
                                     />
                                     {loadingAddress && (
@@ -491,19 +547,26 @@ export default function RegisterPage() {
                                         </div>
                                     )}
                                 </div>
+                                <AddressValidationIndicator />
                                 {addressSuggestions.length > 0 && showAddressMenu && (
                                     <ul className="absolute z-50 w-full mt-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
                                         {addressSuggestions.map((item, index) => (
                                             <li key={index} onClick={() => handleSelectAddress(item)}
                                                 className="px-4 py-3 hover:bg-white/10 cursor-pointer border-b border-white/5 last:border-0 transition-colors">
                                                 <div className="text-white text-sm font-medium">
-                                                    {item.properties.name || item.properties.street} {item.properties.housenumber}
+                                                    {item.properties.street} {item.properties.housenumber}
                                                 </div>
                                                 <div className="text-gray-400 text-xs mt-0.5">
                                                     {item.properties.postcode} {item.properties.city}
+                                                    <span className="ml-2 text-green-400">✓ Dirección verificada</span>
                                                 </div>
                                             </li>
                                         ))}
+                                        {addressSuggestions.length === 0 && (
+                                            <li className="px-4 py-3 text-gray-400 text-sm">
+                                                No se encontraron direcciones reales. Intenta con otro término.
+                                            </li>
+                                        )}
                                     </ul>
                                 )}
                                 {errors.address && (
@@ -662,7 +725,7 @@ export default function RegisterPage() {
                                     <Link
                                         to="/terms"
                                         className="text-white hover:underline font-medium"
-                                        onClick={(e) => e.stopPropagation()} // Prevenir cambio del checkbox al hacer clic
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         términos
                                     </Link>{' '}
@@ -670,7 +733,7 @@ export default function RegisterPage() {
                                     <Link
                                         to="/privacy"
                                         className="text-white hover:underline font-medium"
-                                        onClick={(e) => e.stopPropagation()} // Prevenir cambio del checkbox al hacer clic
+                                        onClick={(e) => e.stopPropagation()}
                                     >
                                         política de privacidad
                                     </Link>
@@ -687,7 +750,7 @@ export default function RegisterPage() {
                             {isLoading ? <Loader2 className="animate-spin" /> : <><span>Crear cuenta</span><ArrowRight size={20}/></>}
                         </button>
 
-                        {/* Sociales */}
+                        {/* Sociales - SOLO DOS BOTONES */}
                         <div className="relative my-6 md:my-8">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-white/10"/>
@@ -696,7 +759,7 @@ export default function RegisterPage() {
                                 <span className="px-4 bg-black text-gray-500">o regístrate con</span>
                             </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-3 md:gap-4">
+                        <div className="grid grid-cols-2 gap-3 md:gap-4">
                             {/* Google */}
                             <button
                                 type="button"
