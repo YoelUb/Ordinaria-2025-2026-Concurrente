@@ -18,7 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS btree_gist")
+    # ELIMINADO: No creamos la extensión btree_gist ni la constraint de exclusión
+    # porque ahora gestionamos la capacidad (aforo) desde el código Python (routers/reservations.py)
 
     op.create_table('reservations',
                     sa.Column('id', sa.Integer(), nullable=False),
@@ -27,7 +28,8 @@ def upgrade() -> None:
                     sa.Column('start_time', sa.DateTime(timezone=True), nullable=False),
                     sa.Column('end_time', sa.DateTime(timezone=True), nullable=False),
                     sa.Column('status', sa.String(), server_default='confirmed', nullable=False),
-                    sa.Column('price', sa.Float(), nullable=True),
+                    # CAMBIO: price nullable=False y default 0.0 para consistencia
+                    sa.Column('price', sa.Float(), server_default='0.0', nullable=False),
                     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
                     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
                     sa.PrimaryKeyConstraint('id')
@@ -36,13 +38,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_reservations_facility'), 'reservations', ['facility'], unique=False)
     op.create_index(op.f('ix_reservations_id'), 'reservations', ['id'], unique=False)
 
-    op.execute("""
-               ALTER TABLE reservations
-                   ADD CONSTRAINT exclude_reservation_overlap EXCLUDE USING gist (
-            facility WITH =, 
-            tstzrange(start_time, end_time, '[]') WITH &&
-        );
-               """)
 
 
 def downgrade() -> None:

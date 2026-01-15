@@ -158,10 +158,10 @@ export default function Dashboard() {
     const [busySlots, setBusySlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
 
-    // Información de capacidad (para backend)
-    const [facilityCapacity] = useState<{[key: string]: FacilityInfo}>({
-        'Pádel Court 1': { name: 'Pádel Court 1', price: 15.00, capacity: 1, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
-        'Pádel Court 2': { name: 'Pádel Court 2', price: 15.00, capacity: 1, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
+    // Información de capacidad (convertido a estado)
+    const [facilityCapacity, setFacilityCapacity] = useState<{[key: string]: FacilityInfo}>({
+        'Pádel Court 1': { name: 'Pádel Court 1', price: 15.00, capacity: 4, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
+        'Pádel Court 2': { name: 'Pádel Court 2', price: 15.00, capacity: 4, currentReservations: 0, icon: '🎾', color: 'from-blue-500 to-cyan-500' },
         'Piscina': { name: 'Piscina', price: 8.00, capacity: 20, currentReservations: 0, icon: '🏊', color: 'from-cyan-500 to-teal-500' },
         'Gimnasio': { name: 'Gimnasio', price: 5.00, capacity: 30, currentReservations: 0, icon: '💪', color: 'from-purple-500 to-pink-500' },
         'Sauna': { name: 'Sauna', price: 10.00, capacity: 10, currentReservations: 0, icon: '🔥', color: 'from-orange-500 to-red-500' }
@@ -178,66 +178,89 @@ export default function Dashboard() {
         document.documentElement.classList.toggle('dark', isDarkMode);
     }, [isDarkMode]);
 
-    // --- 1. Cargar Datos y Polling ---
-    useEffect(() => {
-        const fetchData = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                navigate('/login');
+    // Función para cargar datos del backend
+    const fetchData = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            navigate('/login');
+            return;
+        }
+
+        try {
+            const headers = {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'};
+
+            // Cargar usuario
+            const userResponse = await fetch('http://localhost:8000/api/v1/users/me', {headers});
+            if (userResponse.status === 401) {
+                handleLogout();
                 return;
             }
 
-            try {
-                const headers = {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'};
-
-                const userResponse = await fetch('http://localhost:8000/api/v1/users/me', {headers});
-                if (userResponse.status === 401) {
-                    handleLogout();
-                    return;
+            if (userResponse.ok) {
+                const userData = await userResponse.json();
+                if (userData.avatar_url && !userData.avatar_url.startsWith('http')) {
+                    userData.avatar_url = `http://localhost:8000${userData.avatar_url}`;
                 }
+                setUser(userData);
 
-                if (userResponse.ok) {
-                    const userData = await userResponse.json();
-                    if (userData.avatar_url && !userData.avatar_url.startsWith('http')) {
-                        userData.avatar_url = `http://localhost:8000${userData.avatar_url}`;
-                    }
-                    setUser(userData);
+                if ((!userData.phone || !userData.address || !userData.apartment) && !showCompleteProfile) {
+                    setProfileForm(prev => ({
+                        phone: userData.phone || prev.phone,
+                        address: userData.address || prev.address,
+                        apartment: userData.apartment || prev.apartment,
+                        postal_code: userData.postal_code || prev.postal_code
+                    }));
 
-                    if ((!userData.phone || !userData.address || !userData.apartment) && !showCompleteProfile) {
-                        setProfileForm(prev => ({
-                            phone: userData.phone || prev.phone,
-                            address: userData.address || prev.address,
-                            apartment: userData.apartment || prev.apartment,
-                            postal_code: userData.postal_code || prev.postal_code
-                        }));
-
-                        if (!toastShownRef.current) {
-                            setShowCompleteProfile(true);
-                            toast("Por favor completa tu perfil para continuar", {icon: '📝', duration: 5000});
-                            toastShownRef.current = true;
-                        }
+                    if (!toastShownRef.current) {
+                        setShowCompleteProfile(true);
+                        toast("Por favor completa tu perfil para continuar", {icon: '📝', duration: 5000});
+                        toastShownRef.current = true;
                     }
                 }
-
-                const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', {headers});
-                if (resResponse.ok) {
-                    const resData = await resResponse.json();
-                    const sortedRes = resData.sort((a: Reservation, b: Reservation) =>
-                        new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
-                    );
-
-                    if (JSON.stringify(sortedRes) !== JSON.stringify(reservations)) {
-                        setReservations(sortedRes);
-                    }
-                }
-
-            } catch (error) {
-                console.error("Error fetching data", error);
-            } finally {
-                setLoading(false);
             }
-        };
 
+            // Cargar reservas
+            const resResponse = await fetch('http://localhost:8000/api/v1/reservations/me', {headers});
+            if (resResponse.ok) {
+                const resData = await resResponse.json();
+                const sortedRes = resData.sort((a: Reservation, b: Reservation) =>
+                    new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+                );
+
+                if (JSON.stringify(sortedRes) !== JSON.stringify(reservations)) {
+                    setReservations(sortedRes);
+                }
+            }
+
+            // Cargar capacidad de instalaciones
+            const capacityResponse = await fetch('http://localhost:8000/api/v1/reservations/capacity', {headers});
+            if (capacityResponse.ok) {
+                const capacityData = await capacityResponse.json();
+
+                // Actualizar facilityCapacity con datos reales
+                setFacilityCapacity(prev => {
+                    const updated = { ...prev };
+                    Object.keys(updated).forEach(facilityName => {
+                        if (capacityData[facilityName]) {
+                            updated[facilityName] = {
+                                ...updated[facilityName],
+                                currentReservations: capacityData[facilityName].current || 0
+                            };
+                        }
+                    });
+                    return updated;
+                });
+            }
+
+        } catch (error) {
+            console.error("Error fetching data", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- 1. Cargar Datos y Polling ---
+    useEffect(() => {
         fetchData();
 
         const intervalId = setInterval(() => {
@@ -253,6 +276,8 @@ export default function Dashboard() {
     useEffect(() => {
         if (notificationProcessedRef.current) return;
         const paymentSuccess = localStorage.getItem('paymentSuccess');
+        const reservationCancelled = localStorage.getItem('reservationCancelled');
+
         if (paymentSuccess) {
             notificationProcessedRef.current = true;
             const newNotif = {
@@ -265,6 +290,26 @@ export default function Dashboard() {
             localStorage.removeItem('paymentSuccess');
             setShowNotifications(true);
             setTimeout(() => setShowNotifications(false), 4000);
+
+            // Recargar datos después de una reserva exitosa
+            fetchData();
+        }
+
+        if (reservationCancelled) {
+            notificationProcessedRef.current = true;
+            const newNotif = {
+                id: Date.now(),
+                text: "Reserva cancelada correctamente",
+                read: false,
+                time: "Ahora mismo"
+            };
+            setNotifications(prev => [newNotif, ...prev]);
+            localStorage.removeItem('reservationCancelled');
+            setShowNotifications(true);
+            setTimeout(() => setShowNotifications(false), 4000);
+
+            // Recargar datos después de cancelar
+            fetchData();
         }
     }, []);
 
@@ -293,20 +338,26 @@ export default function Dashboard() {
                     setBusySlots(occupiedStartTimes);
                 }
 
-                // OBTENER CAPACIDAD Y RESERVAS ACTUALES (BACKEND)
-                // Esta sería la llamada al backend para obtener la información de capacidad
-                // Por ahora usamos datos simulados
-                /*
-                const capacityResponse = await fetch(
-                    `http://localhost:8000/api/v1/reservations/capacity?facility=${encodeURIComponent(newResFacility)}&date=${newResDate}`,
-                    {headers: {'Authorization': `Bearer ${token}`}}
-                );
+                // Actualizar capacidad en tiempo real mientras el modal esté abierto
+                const capacityResponse = await fetch('http://localhost:8000/api/v1/reservations/capacity', {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
 
                 if (capacityResponse.ok) {
                     const capacityData = await capacityResponse.json();
-                    // Actualizar facilityCapacity con datos reales
+                    setFacilityCapacity(prev => {
+                        const updated = { ...prev };
+                        Object.keys(updated).forEach(facilityName => {
+                            if (capacityData[facilityName]) {
+                                updated[facilityName] = {
+                                    ...updated[facilityName],
+                                    currentReservations: capacityData[facilityName].current || 0
+                                };
+                            }
+                        });
+                        return updated;
+                    });
                 }
-                */
 
             } catch (error) {
                 console.error(error);
@@ -450,7 +501,10 @@ export default function Dashboard() {
             });
 
             if (response.ok) {
+                // Actualizar estado local
                 setReservations(prev => prev.filter(res => res.id !== reservationId));
+
+                // Añadir notificación
                 const newNotif = {
                     id: Date.now(),
                     text: "Reserva eliminada correctamente",
@@ -458,6 +512,13 @@ export default function Dashboard() {
                     time: "Ahora mismo"
                 };
                 setNotifications(prev => [newNotif, ...prev]);
+
+                // Guardar en localStorage para mostrar notificación al recargar
+                localStorage.setItem('reservationCancelled', 'true');
+
+                // Recargar datos
+                fetchData();
+
                 toast.success("Reserva eliminada correctamente", {id: loadingToast});
                 setShowDeleteModal(false);
                 setReservationToDelete(null);
@@ -487,6 +548,8 @@ export default function Dashboard() {
                 toast.success("Cuenta eliminada correctamente", {id: loadingToast});
                 localStorage.removeItem('token');
                 localStorage.removeItem('darkMode');
+                localStorage.removeItem('paymentSuccess');
+                localStorage.removeItem('reservationCancelled');
                 navigate('/login');
             } else {
                 throw new Error("Error al eliminar cuenta");
@@ -508,6 +571,8 @@ export default function Dashboard() {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('paymentSuccess');
+        localStorage.removeItem('reservationCancelled');
         navigate('/login');
     };
 
@@ -602,7 +667,7 @@ export default function Dashboard() {
         const tax = price * 0.21;
         const total = price + tax;
 
-        // Verificar capacidad (esto se hará mejor en el backend)
+        // Verificar capacidad
         const currentFacility = facilityCapacity[newResFacility];
         if (currentFacility && currentFacility.currentReservations >= currentFacility.capacity) {
             toast.error(`¡Capacidad completa! Solo hay ${currentFacility.capacity} plazas disponibles.`);
@@ -649,13 +714,13 @@ export default function Dashboard() {
     };
 
     if (loading) return <div
-        className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-black' : 'bg-gray-100'}`}>
+        className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
         <Loader2 className="animate-spin text-purple-500" size={48}/>
     </div>;
 
     return (
         <div
-            className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'} relative`}>
+            className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'} relative`}>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
                 * { font-family: 'Inter', sans-serif; }
@@ -676,7 +741,7 @@ export default function Dashboard() {
                 <Menu size={24}/>
             </button>
 
-            {/* Sidebar con mejor contraste */}
+            {/* Sidebar - CONTRASTE PERFECTO: BLANCO/NEGRO */}
             <aside
                 className={`fixed left-0 top-0 h-screen w-64 glass border-r ${isDarkMode ? 'border-white/10 bg-gray-900' : 'border-gray-200 bg-white'} p-6 z-40 transition-transform duration-300 ${
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -709,13 +774,13 @@ export default function Dashboard() {
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all border-none cursor-pointer ${
                                 activeTab === item.id
                                     ? (isDarkMode ? 'bg-white text-black' : 'bg-gray-900 text-white')
-                                    : (isDarkMode ? 'text-gray-200 hover:text-white hover:bg-white/10' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100')
+                                    : (isDarkMode ? 'text-white hover:text-white hover:bg-white/10' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100')
                             }`}
                         >
-                            <span className={`${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-gray-200' : 'text-gray-600')}`}>
+                            <span className={`${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-white' : 'text-gray-700')}`}>
                                 {item.icon}
                             </span>
-                            <span className={`font-medium ${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-gray-200' : 'text-gray-700')}`}>
+                            <span className={`font-medium ${activeTab === item.id ? (isDarkMode ? 'text-black' : 'text-white') : (isDarkMode ? 'text-white' : 'text-gray-700')}`}>
                                 {item.label}
                             </span>
                         </button>
@@ -723,7 +788,7 @@ export default function Dashboard() {
                 </nav>
 
                 <button onClick={handleLogout}
-                        className={`absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-3 transition cursor-pointer bg-transparent border-none ${isDarkMode ? 'text-gray-200 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                        className={`absolute bottom-6 left-6 right-6 flex items-center gap-3 px-4 py-3 transition cursor-pointer bg-transparent border-none ${isDarkMode ? 'text-white hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}>
                     <LogOut size={20}/>
                     <span>Cerrar sesión</span>
                 </button>
@@ -737,7 +802,7 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* Main Content */}
+            {/* Main Content - CONTRASTE PERFECTO */}
             <main className="md:ml-64 p-4 md:p-8 pt-20 md:pt-8">
                 <header className="flex justify-between items-center mb-8 md:mb-12">
                     <div className="md:ml-0 ml-12 md:ml-0">
@@ -843,7 +908,7 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Reservas totales</p>
-                                        <p className="text-2xl md:text-3xl font-light">{reservations.length}</p>
+                                        <p className={`text-2xl md:text-3xl font-light ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{reservations.length}</p>
                                     </div>
                                 </div>
                             </div>
