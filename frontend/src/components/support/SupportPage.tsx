@@ -257,7 +257,7 @@ export default function SupportPage() {
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">Email General</p>
-                    <p className="font-semibold text-lg">uaxconcurrente@gmail.com</p>
+                    <p className="font-semibold text-lg">soporte@comunidadvecinos.com</p>
                   </div>
                 </div>
               </div>

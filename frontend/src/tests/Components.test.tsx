@@ -76,11 +76,14 @@ describe('Frontend Unit Tests', () => {
         expect(screen.getByPlaceholderText(/nombre@ejemplo.com/i)).toBeInTheDocument();
     });
 
-    // 6. Support Page
+   // 6. Support Page (CORREGIDO: Selector específico para el encabezado)
     it('6. SupportPage renders contact form', () => {
         renderWithRouter(<SupportPage />);
-        expect(screen.getByText(/Centro de/i)).toBeInTheDocument();
-        expect(screen.getByText(/Soporte/i)).toBeInTheDocument();
+
+        const heading = screen.getByRole('heading', { level: 1 });
+        expect(heading).toHaveTextContent(/Centro de/i);
+        expect(heading).toHaveTextContent(/Soporte/i);
+
         expect(screen.getByPlaceholderText(/¿En qué podemos ayudarte?/i)).toBeInTheDocument();
     });
 
