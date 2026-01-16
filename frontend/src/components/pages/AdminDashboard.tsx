@@ -286,8 +286,7 @@ export default function AdminDashboard() {
                 {/* Logo Area */}
                 <div className={`p-4 flex items-center ${sidebarCollapsed ? 'lg:justify-center' : 'justify-between'}`}>
                     <div
-                        className="flex items-center gap-3 cursor-pointer"
-                        onClick={() => navigate('/')}
+                        className="flex items-center gap-3"
                     >
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/20">
                             <Shield size={16} className="text-white" />

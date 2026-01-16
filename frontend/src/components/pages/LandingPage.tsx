@@ -42,6 +42,7 @@ const FACILITY_ASSETS: { [key: string]: { image: string, subtitle: string, specs
     }
 };
 
+
 // Mapeo de nombres alternativos para mejor matching
 const FACILITY_NAME_MAP: { [key: string]: string[] } = {
     'Padel Court 1': ['padel court 1', 'padel 1', 'pista padel 1', 'pista de padel 1', 'pádel court 1', 'pádel 1'],
@@ -135,6 +136,14 @@ export default function LandingPage() {
     const pollingRef = useRef<number | null>(null);
     const retryTimeoutRef = useRef<number | null>(null);
     const navigate = useNavigate();
+
+
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
 
     // --- FUNCIÓN PARA CARGAR DATOS ---
     const fetchFacilities = async (isRetry = false, isManual = false) => {
@@ -392,22 +401,32 @@ export default function LandingPage() {
                 className={`fixed top-0 w-full z-50 transition-all duration-500 ${showNav ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
                 <div className="glass px-6 py-4 mx-4 mt-4 rounded-full">
                     <div className="max-w-7xl mx-auto flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center"><span
-                                className="text-black font-bold text-sm">R</span></div>
+                        {/* Logo para hacer scroll al inicio */}
+                        <button
+                            onClick={scrollToTop}
+                            className="flex items-center gap-2 bg-transparent border-none cursor-pointer text-white hover:text-gray-300 transition"
+                        >
+                            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                                <span className="text-black font-bold text-sm">R</span>
+                            </div>
                             <span className="font-semibold">RESIDENCIAL</span>
-                        </div>
+                        </button>
+
                         <div className="hidden md:flex gap-8 text-sm font-medium">
                             <button onClick={() => scrollToSection('services')}
-                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">Servicios
+                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">
+                                Servicios
                             </button>
                             <button onClick={() => scrollToSection('facilities')}
-                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">Instalaciones
+                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">
+                                Instalaciones
                             </button>
                             <button onClick={() => scrollToSection('features')}
-                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">Beneficios
+                                    className="hover:text-gray-300 transition bg-transparent border-none cursor-pointer text-white">
+                                Beneficios
                             </button>
                         </div>
+
                         <button onClick={handleReserveAction}
                                 className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-200 transition cursor-pointer border-none">
                             <Lock size={16}/>Acceder
@@ -608,14 +627,17 @@ export default function LandingPage() {
                         </div>
 
                         {/* Columna de imagen */}
-                        <div className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl mt-8 md:mt-0" style={{
-                            transform: `scale(${0.8 + Math.min(0.2, (scrollY - 1500) / 1500)})`,
-                            opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 400))
-                        }}>
+                        <div
+                            className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl mt-8 md:mt-0"
+                            style={{
+                                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 1500) / 1500)})`,
+                                opacity: Math.max(0, Math.min(1, (scrollY - 1500) / 400))
+                            }}>
                             <img src="/images/padel_3.jpg" alt="Padel"
                                  className="w-full h-full object-cover"
                                  loading="lazy"/>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            <div
+                                className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
                             {/* Etiqueta en la imagen */}
                             <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
                                 <p className="text-sm font-medium text-white">Pista Principal</p>
@@ -631,14 +653,17 @@ export default function LandingPage() {
                 <div className="sticky top-0 h-screen flex items-center justify-center px-6">
                     <div className="max-w-7xl w-full grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
                         {/* Columna de imagen */}
-                        <div className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl" style={{
-                            transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
-                            opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
-                        }}>
+                        <div
+                            className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl"
+                            style={{
+                                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 2500) / 1500)})`,
+                                opacity: Math.max(0, Math.min(1, (scrollY - 2500) / 400))
+                            }}>
                             <img src="/images/piscina_2.jpg" alt="Pool"
                                  className="w-full h-full object-cover"
                                  loading="lazy"/>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            <div
+                                className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
                             <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
                                 <p className="text-sm font-medium text-white">Wellness Center</p>
                                 <p className="text-xs text-gray-300">28°C constante</p>
@@ -753,14 +778,17 @@ export default function LandingPage() {
                         </div>
 
                         {/* Columna de imagen */}
-                        <div className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl order-1 md:order-2" style={{
-                            transform: `scale(${0.8 + Math.min(0.2, (scrollY - 3500) / 1500)})`,
-                            opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 400))
-                        }}>
+                        <div
+                            className="relative h-[300px] md:h-[400px] lg:h-[500px] xl:h-[600px] rounded-2xl overflow-hidden shadow-2xl order-1 md:order-2"
+                            style={{
+                                transform: `scale(${0.8 + Math.min(0.2, (scrollY - 3500) / 1500)})`,
+                                opacity: Math.max(0, Math.min(1, (scrollY - 3500) / 400))
+                            }}>
                             <img src="/images/gym_3.jpg" alt="Gym"
                                  className="w-full h-full object-cover"
                                  loading="lazy"/>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            <div
+                                className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
                             {/* Etiqueta en la imagen */}
                             <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-lg">
                                 <p className="text-sm font-medium text-white">Área Cardio</p>
@@ -844,8 +872,9 @@ export default function LandingPage() {
 
             <section id="cta" className="py-32 px-6 text-center bg-gradient-to-b from-gray-950 to-black">
                 <div className="max-w-4xl mx-auto">
-                    <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight text-white">Tu experiencia<br/><span
-                        className="font-semibold">comienza aquí.</span></h2>
+                    <h2 className="text-5xl md:text-7xl font-light mb-8 leading-tight text-white">Tu
+                        experiencia<br/><span
+                            className="font-semibold">comienza aquí.</span></h2>
                     <p className="text-xl text-gray-300 mb-12 leading-relaxed font-light max-w-2xl mx-auto">Únete a una
                         comunidad que valora su tiempo y disfruta de instalaciones de primera clase.</p>
                     <button onClick={handleReserveAction}
@@ -874,6 +903,16 @@ export default function LandingPage() {
                     </div>
                 </div>
             </footer>
+            {/* Botón flotante para volver arriba */}
+            {scrollY > 800 && (
+                <button
+                    onClick={scrollToTop}
+                    className="fixed bottom-8 right-8 z-40 glass p-3 rounded-full hover:bg-white/10 transition cursor-pointer border border-white/10 text-white backdrop-blur-sm"
+                    aria-label="Volver arriba"
+                >
+                    ↑
+                </button>
+            )}
 
             {/* Estilos CSS adicionales */}
             <style>{`

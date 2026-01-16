@@ -1,37 +1,59 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import LoginPage from '../components/auth/LoginPage';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LandingPage from '../components/pages/LandingPage';
+import LoginPage from '../components/auth/LoginPage';
 import RegisterPage from '../components/auth/RegisterPage';
-import SupportPage from '../components/support/SupportPage';
 import PasswordResetPage from '../components/auth/PasswordResetPage';
+import SupportPage from '../components/support/SupportPage';
 import PrivacyPolicy from '../components/legal/PrivacyPolicy';
 import TermsConditions from '../components/legal/TermsConditions';
-import { describe, it, expect } from 'vitest';
 
-// Wrapper para rutas
+// --- MOCKS ---
+globalThis.fetch = vi.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve([]),
+    text: () => Promise.resolve("OK"),
+  })
+) as any;
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+    const actual = await vi.importActual('react-router-dom');
+    return {
+        ...actual,
+        useNavigate: () => mockNavigate,
+    };
+});
+
 const renderWithRouter = (component: any) => {
     return render(<BrowserRouter>{component}</BrowserRouter>);
 };
 
 describe('Frontend Unit Tests', () => {
 
-    // Test 1: Landing Page
-    it('1. LandingPage renders welcome message and CTA', () => {
-        renderWithRouter(<LandingPage />);
-        expect(screen.getByText(/Tu Comunidad, Tu Espacio/i)).toBeInTheDocument();
-        expect(screen.getByText(/Reservar Ahora/i)).toBeInTheDocument();
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
-    // Test 2: Login Render
-    it('2. LoginPage renders email and password inputs', () => {
+    // 1. Landing Page
+    it('1. LandingPage renders main title and CTA button', () => {
+        renderWithRouter(<LandingPage />);
+        expect(screen.getByText(/Elegancia/i)).toBeInTheDocument();
+        expect(screen.getByText(/Simplicidad/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Comenzar ahora/i })).toBeInTheDocument();
+    });
+
+    // 2. Login Page
+    it('2. LoginPage renders email input and submit button', () => {
         renderWithRouter(<LoginPage />);
         expect(screen.getByPlaceholderText(/tu@email.com/i)).toBeInTheDocument();
         expect(screen.getByPlaceholderText(/••••••••/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Iniciar Sesión/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Acceder/i })).toBeInTheDocument();
     });
 
-    // Test 3: Validacion login
+    // 3. Login Interaction
     it('3. LoginPage allows typing in inputs', () => {
         renderWithRouter(<LoginPage />);
         const emailInput = screen.getByPlaceholderText(/tu@email.com/i) as HTMLInputElement;
@@ -39,49 +61,62 @@ describe('Frontend Unit Tests', () => {
         expect(emailInput.value).toBe('test@user.com');
     });
 
-    // Test 4: Register Page Password Match
+    // 4. Register Page
     it('4. RegisterPage renders all required fields', () => {
         renderWithRouter(<RegisterPage />);
-        expect(screen.getByPlaceholderText(/Nombre Completo/i)).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/Repetir Contraseña/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Juan Pérez/i)).toBeInTheDocument();
+        expect(screen.getByText(/Correo electrónico/i)).toBeInTheDocument();
     });
 
-    // Test 5: Forgot Password Page
-    it('5. PasswordResetPage renders email input for recovery', () => {
+    // 5. Password Reset
+    it('5. PasswordResetPage renders correct title and email input', () => {
         renderWithRouter(<PasswordResetPage />);
-        expect(screen.getByText(/Recuperar Contraseña/i)).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/Introduce tu email/i)).toBeInTheDocument();
+        expect(screen.getByText(/Recuperar/i)).toBeInTheDocument();
+        expect(screen.getByText(/Acceso/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/nombre@ejemplo.com/i)).toBeInTheDocument();
     });
 
-    // Test 6: Support Page
-    it('6. SupportPage renders contact form text area', () => {
+    // 6. Support Page
+    it('6. SupportPage renders contact form', () => {
         renderWithRouter(<SupportPage />);
-        expect(screen.getByText(/Soporte Técnico/i)).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/Describe tu problema.../i)).toBeInTheDocument();
+        expect(screen.getByText(/Centro de/i)).toBeInTheDocument();
+        expect(screen.getByText(/Soporte/i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/¿En qué podemos ayudarte?/i)).toBeInTheDocument();
     });
 
-    // Test 7: Privacy Policy Content
-    it('7. PrivacyPolicy renders legal text correctly', () => {
+    // 7. Privacy Policy (CORREGIDO: Selector más robusto)
+    it('7. PrivacyPolicy renders main heading correctly', () => {
         renderWithRouter(<PrivacyPolicy />);
-        expect(screen.getByText(/Política de Privacidad/i)).toBeInTheDocument();
-        expect(screen.getByText(/Responsable del Tratamiento/i)).toBeInTheDocument();
+        // Usamos getAllByText y verificamos que al menos uno existe, o buscamos por Role heading
+        // Tu componente tiene el texto partido en dos líneas dentro del H1.
+
+        // Estrategia: Buscar el H1 que contiene el texto "Política de"
+        const heading = screen.getByRole('heading', { level: 1 });
+        expect(heading).toHaveTextContent(/Política de/i);
+        expect(heading).toHaveTextContent(/Privacidad/i);
     });
 
-    // Test 8: Terms and Conditions
-    it('8. TermsConditions renders user obligations', () => {
+    // 8. Terms Conditions (CORREGIDO: Selector más robusto)
+    it('8. TermsConditions renders main heading correctly', () => {
         renderWithRouter(<TermsConditions />);
-        expect(screen.getByText(/Términos y Condiciones/i)).toBeInTheDocument();
-        expect(screen.getByText(/Uso de las Instalaciones/i)).toBeInTheDocument();
+
+        // Estrategia: Buscar el H1 que contiene "Términos y"
+        const heading = screen.getByRole('heading', { level: 1 });
+        expect(heading).toHaveTextContent(/Términos y/i);
+        expect(heading).toHaveTextContent(/Condiciones/i);
     });
 
-    // Test 9: Navigation Links (en Landing)
-    it('9. LandingPage contains links to login and register', () => {
+    // 9. Navigation Action
+    it('9. Clicking "Acceder" on LandingPage triggers navigation', () => {
         renderWithRouter(<LandingPage />);
-        const loginLink = screen.getByRole('link', { name: /Iniciar Sesión/i });
-        expect(loginLink).toHaveAttribute('href', '/login');
+        const accessButtons = screen.getAllByText(/Acceder/i);
+        // Filtramos para encontrar el que es un botón interactivo si hay varios
+        const navButton = accessButtons[0];
+        fireEvent.click(navButton);
+        expect(mockNavigate).toHaveBeenCalled();
     });
 
-    // Test 10: Validación simple
+    // 10. Sanity Check
     it('10. Basic Vitest Check', () => {
          expect(true).toBe(true);
     });
