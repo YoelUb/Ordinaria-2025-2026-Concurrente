@@ -15,8 +15,8 @@ export default function PaymentGateway() {
     const [progress, setProgress] = useState(0);
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const [hasSubmitted, setHasSubmitted] = useState(false); // NUEVO: Previene doble envío
-    const submissionRef = useRef(false); // NUEVO: Referencia para bloqueo inmediato
+    const [hasSubmitted, setHasSubmitted] = useState(false);
+    const submissionRef = useRef(false);
 
     useEffect(() => {
         if (!reservationData || !displayData) {
@@ -27,16 +27,16 @@ export default function PaymentGateway() {
 
     if (!displayData) return null;
 
-    // --- VALIDACIÓN DE DATOS (Se ejecuta al pulsar Pagar) ---
+    // Validacion al pagar
     const validateCard = () => {
         const newErrors: any = {};
 
-        // 1. Validar número (16 dígitos)
+        // Validar número (16 dígitos)
         const cardNumber = cardData.number.replace(/\s/g, '');
         if (!cardNumber) newErrors.number = 'El número es obligatorio';
         else if (cardNumber.length !== 16 || !/^\d+$/.test(cardNumber)) newErrors.number = 'Número inválido (16 dígitos)';
 
-        // 2. Validar nombre (Sin números y mínimo 3 letras)
+        // Validar nombre
         const NAME_REGEX = /^[a-zA-ZÀ-ÿ\s]+$/;
         if (!cardData.name.trim()) {
             newErrors.name = 'El nombre es obligatorio';
@@ -46,7 +46,7 @@ export default function PaymentGateway() {
             newErrors.name = 'No se permiten números en el nombre';
         }
 
-        // 3. Validar expiración (Formato y Fecha Real)
+        // Validar expiración
         if (!cardData.expiry) {
             newErrors.expiry = 'Obligatorio';
         } else if (!/^\d{2}\/\d{2}$/.test(cardData.expiry)) {
@@ -65,7 +65,7 @@ export default function PaymentGateway() {
             }
         }
 
-        // 4. Validar CVV (Estricto 3 dígitos)
+        // Validar CVV (Estricto 3 dígitos)
         if (!cardData.cvv) newErrors.cvv = 'Obligatorio';
         else if (!/^\d{3}$/.test(cardData.cvv)) newErrors.cvv = 'Debe ser de 3 dígitos';
 
@@ -73,7 +73,6 @@ export default function PaymentGateway() {
         return Object.keys(newErrors).length === 0;
     };
 
-    // --- FORMATEO EN TIEMPO REAL (Mientras escribes) ---
     const handleInputChange = (field: string, value: string) => {
         let formattedValue = value;
 

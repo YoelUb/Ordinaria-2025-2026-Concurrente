@@ -82,7 +82,7 @@ export default function AdminDashboard() {
     const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
     const [editForm, setEditForm] = useState({ price: 0, capacity: 0 });
 
-    // --- LÓGICA DE DATOS ---
+    // Logica de datos
     const fetchAllData = useCallback(async () => {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -111,7 +111,7 @@ export default function AdminDashboard() {
                 popular_facility: 'N/A'
             };
 
-            // 1. Stats Backend
+            // Stats Backend
             if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
                 try {
                     const d = await statsRes.value.json();
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
                 } catch (e) { console.warn(e); }
             }
 
-            // 2. Usuarios
+            // Usuarios
             if (usersRes.status === 'fulfilled' && usersRes.value.ok) {
                 try {
                     const d = await usersRes.value.json();
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
                 } catch (e) { setUsers([]); }
             }
 
-            // 3. Reservas
+            // Reservas
             let reservationsData: ReservationData[] = [];
             if (resRes.status === 'fulfilled' && resRes.value.ok) {
                 try {
@@ -160,7 +160,7 @@ export default function AdminDashboard() {
                 } catch (e) { setReservations([]); }
             }
 
-            // 4. Instalaciones e Ingresos
+            // Instalaciones e Ingresos
             if (facRes.status === 'fulfilled' && facRes.value.ok) {
                 try {
                     const rawFac = await facRes.value.json();
@@ -212,7 +212,6 @@ export default function AdminDashboard() {
         return () => { mounted = false; clearInterval(interval); };
     }, [fetchAllData]);
 
-    // --- Handlers ---
     const handleLogout = () => {
         localStorage.removeItem('token');
         navigate('/login');
@@ -433,7 +432,6 @@ export default function AdminDashboard() {
                                                             <p className="text-xs text-gray-500">{res.facility} • {formatDate(res.start_time)}</p>
                                                         </div>
                                                     </div>
-                                                    <span className="text-sm font-light">{safeCurrency(res.price)}</span>
                                                 </div>
                                             ))}
                                         </div>

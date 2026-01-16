@@ -299,7 +299,6 @@ export default function LandingPage() {
         }
     };
 
-    // --- CARGAR DATOS INICIAL Y CONFIGURAR POLLING ---
     useEffect(() => {
         // Carga inicial
         fetchFacilities();
@@ -327,7 +326,7 @@ export default function LandingPage() {
         };
     }, []);
 
-    // --- Lógica para redirección inteligente ---
+    //  Lógica para redirección inteligente
     const handleReserveAction = () => {
         const token = localStorage.getItem('token');
         if (token) {
