@@ -7,7 +7,7 @@ from src.db.session import get_db
 from src.core.deps import get_current_user, get_current_admin
 from src.models.user_model import User
 from src.models.reservation_model import Reservation
-from src.models.facility_model import Facility  # <--- IMPORTANTE: Nuevo modelo
+from src.models.facility_model import Facility
 from src.schemas.reservation_schema import ReservationCreate, ReservationResponse
 from pydantic import BaseModel
 
@@ -21,7 +21,7 @@ class AdminStats(BaseModel):
     popular_facility: str
 
 
-# --- GESTIÓN DE INSTALACIONES (PRECIOS Y AFORO DINÁMICOS) ---
+# Gestión de instalaciones 
 
 @router.get("/facilities")
 def get_facilities(db: Session = Depends(get_db)):
@@ -51,7 +51,7 @@ def update_facility(
     return {"message": f"Instalación {facility.name} actualizada correctamente"}
 
 
-# --- GESTIÓN DE RESERVAS ---
+# Gestión de reservas
 
 @router.post("/", response_model=ReservationResponse)
 def create_reservation(
@@ -59,17 +59,19 @@ def create_reservation(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    # 1. Validar fechas
+    # Validar fechas
     if reservation.start_time >= reservation.end_time:
         raise HTTPException(status_code=400, detail="La hora de inicio debe ser anterior a la de fin")
 
-    # 2. Obtener configuración DE LA BASE DE DATOS (Dinámico)
-    facility_conf = db.query(Facility).filter(Facility.name == reservation.facility).first()
+    facility_conf = db.query(Facility)\
+        .filter(Facility.name == reservation.facility)\
+        .with_for_update()\
+        .first()
 
     if not facility_conf:
         raise HTTPException(status_code=404, detail="Instalación no encontrada o no disponible")
 
-    # 3. EVITAR DUPLICADOS DEL MISMO USUARIO
+    # Evitar duplicados 
     already_booked = db.query(Reservation).filter(
         Reservation.user_id == current_user.id,
         Reservation.facility == reservation.facility,
@@ -83,7 +85,7 @@ def create_reservation(
             detail="Ya tienes una plaza reservada en este horario."
         )
 
-    # 4. CONTROL DE AFORO (Usando la capacidad de la BD)
+    # Control de aforo
     existing_count = db.query(Reservation).filter(
         Reservation.facility == reservation.facility,
         Reservation.start_time < reservation.end_time,
@@ -96,7 +98,7 @@ def create_reservation(
             detail=f"Aforo completo ({existing_count}/{facility_conf.capacity} plazas ocupadas)."
         )
 
-    # 5. Calcular precio (Precio base de BD + 21% IVA)
+    # Calcular precio (Precio base de BD + 21% IVA)
     price_with_tax = facility_conf.price * 1.21
 
     new_reservation = Reservation(
@@ -148,6 +150,7 @@ def read_my_reservations(db: Session = Depends(get_db), current_user: User = Dep
 def get_availability(facility: str, date_str: str, db: Session = Depends(get_db)):
     """
     Devuelve ocupación real vs capacidad de la BD.
+    Aquí NO hace falta bloqueo porque es solo lectura.
     """
     try:
         search_date = datetime.strptime(date_str, "%Y-%m-%d").date()
